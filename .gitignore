@@ -1,0 +1,8 @@
+node_modules/
+*.kv
+*.dpapi
+.env*
+app/src-tauri/target/
+app/src-tauri/gen/
+app/src-tauri/resources/
+CLAUDE.local.md

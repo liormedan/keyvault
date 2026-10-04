@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>כספת מפתחות</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+</head>
+<body>
+
+<!-- No vault yet: create -->
+<div class="gate" id="setup" hidden>
+  <form class="card" id="setupForm">
+    <h1>כספת חדשה</h1>
+    <p class="muted">בחר סיסמת אב. <strong>אין דרך לשחזר אותה אם שוכחים.</strong></p>
+    <label>סיסמת אב <input name="a" type="password" required autocomplete="new-password" dir="ltr"></label>
+    <label>שוב, לאימות <input name="b" type="password" required autocomplete="new-password" dir="ltr"></label>
+    <p class="err" id="setupErr" role="alert"></p>
+    <button class="primary" type="submit">יצירת כספת</button>
+    <button class="link theme-toggle" type="button"></button>
+  </form>
+</div>
+
+<!-- Locked -->
+<div class="gate" id="unlock" hidden>
+  <form class="card" id="unlockForm">
+    <h1>כספת מפתחות</h1>
+    <label>סיסמת אב <input name="pw" type="password" required autocomplete="current-password" dir="ltr"></label>
+    <label class="check" id="rememberRow"><input name="remember" type="checkbox"> זכור אותי במחשב הזה</label>
+    <p class="err" id="unlockErr" role="alert"></p>
+    <button class="primary" type="submit" id="unlockBtn">פתיחה</button>
+    <button class="link theme-toggle" type="button"></button>
+  </form>
+</div>
+
+<!-- Unlocked -->
+<div id="main" hidden>
+  <header>
+    <h1>כספת מפתחות</h1>
+    <input type="search" id="q" placeholder="חיפוש" aria-label="חיפוש">
+    <button class="primary" id="add">הוספה</button>
+    <button class="theme-toggle" type="button"></button>
+    <button id="lock">נעילה</button>
+  </header>
+  <div class="layout">
+    <nav id="cats" aria-label="קטגוריות"></nav>
+    <main>
+      <div id="list"></div>
+      <footer>
+        <span class="path" id="path"></span>
+        <button class="link" id="forget" hidden>ביטול הזכירה במחשב הזה</button>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<!-- Pick a type to add -->
+<dialog id="pick">
+  <form method="dialog">
+    <h2>מה להוסיף?</h2>
+    <div class="pick-grid" id="pickGrid"></div>
+    <div class="actions"><button value="cancel">ביטול</button></div>
+  </form>
+</dialog>
+
+<!-- Item: view or edit (built in app.js) -->
+<dialog id="itemDlg" class="wide"></dialog>
+
+<!-- Dev key -->
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h2 id="dlgTitle">הוספת מפתח פיתוח</h2>
+    <label>פרויקט <input name="p" required placeholder="my-app" dir="ltr"></label>
+    <label>שם המפתח <input name="k" required placeholder="SMTP_PASS" dir="ltr"></label>
+    <label>ערך <input name="value" type="password" required autocomplete="off" dir="ltr"></label>
+    <label>הערה (לא חובה) <input name="note" placeholder="למה זה משמש"></label>
+    <div class="actions"><button value="cancel" formnovalidate>ביטול</button><button class="primary" value="ok">שמירה</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "keyvault",
+  "version": "0.1.0",
+  "description": "A local, encrypted vault for developer keys and passwords — one file, a Tauri desktop app and a CLI. libsodium only.",
+  "license": "MIT",
+  "author": "Lior Medan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liormedan/keyvault.git"
+  },
+  "keywords": [
+    "vault",
+    "secrets",
+    "password-manager",
+    "env",
+    "dotenv",
+    "libsodium",
+    "argon2",
+    "tauri",
+    "cli"
+  ],
+  "type": "module",
+  "bin": {
+    "kv": "src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "app:build": "tauri build --no-bundle",
+    "app:installer": "tauri build",
+    "build:backend": "esbuild src/backend.js --bundle --platform=node --format=esm --target=node20 --outfile=app/src-tauri/resources/backend.mjs --log-level=warning --banner:js=\"import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "libsodium-wrappers-sumo": "0.8.4"
+  },
+  "private": true,
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.1",
+    "esbuild": "^0.28.2"
+  }
+}
