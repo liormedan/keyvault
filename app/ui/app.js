@@ -4,6 +4,13 @@ const invoke = window.__TAURI__.core.invoke;
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, attrs); e.append(...kids.filter((k) => k != null)); return e; };
 const toast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 2200); };
+const ask = (text) => new Promise((resolve) => {
+  const d = $("#confirmDlg");
+  $("#confirmText").textContent = text;
+  d.returnValue = "";
+  d.addEventListener("close", () => resolve(d.returnValue === "ok"), { once: true });
+  d.showModal();
+});
 const COPIED = "הועתק — הלוח יתנקה בעוד 20 שניות";
 const DEV = "dev";
 
@@ -124,7 +131,7 @@ function devRow(p, e) {
   const copy = el("button", { textContent: "העתק", onclick: safe(async () => { await kv("copy", { p, k: e.key }); toast(COPIED); }) });
   const edit = el("button", { textContent: "עריכה", onclick: () => openDev(p, e) });
   const del = el("button", { className: "danger", textContent: "מחיקה", onclick: safe(async () => {
-    if (!confirm(`למחוק את ${p}/${e.key}?`)) return;
+    if (!(await ask(`למחוק את ${p}/${e.key}?`))) return;
     await kv("delete", { p, k: e.key }); toast("נמחק"); await load();
   }) });
   return el("div", { className: "row" },
@@ -173,7 +180,7 @@ async function openItem(id) {
     rows.length ? el("dl", { className: "fields" }, ...rows) : el("p", { className: "muted", textContent: "אין שדות מלאים" }),
     el("div", { className: "actions" },
       el("button", { type: "button", className: "danger", textContent: "מחיקה", onclick: safe(async () => {
-        if (!confirm(`למחוק את "${item.title}"?`)) return;
+        if (!(await ask(`למחוק את "${item.title}"?`))) return;
         await kv("itemDelete", { id }); dlg().close(); toast("נמחק"); await load();
       }) }),
       el("button", { type: "button", textContent: "עריכה", onclick: () => editItem(item.type, id) }),
@@ -254,8 +261,64 @@ dlg().addEventListener("close", () => dlg().replaceChildren());
 function pickType() {
   $("#pickGrid").replaceChildren(
     ...Object.entries(TYPES).map(([t, d]) => el("button", { type: "button", textContent: d.label, onclick: () => { $("#pick").close(); editItem(t); } })),
-    el("button", { type: "button", textContent: "מפתח פיתוח", onclick: () => { $("#pick").close(); openDev(); } }));
+    el("button", { type: "button", textContent: "מפתח פיתוח", onclick: () => { $("#pick").close(); openDev(); } }),
+    el("button", { type: "button", className: "wide-btn", textContent: "ייבוא סיסמאות מדפדפן…", onclick: () => { $("#pick").close(); openImport(); } }));
   $("#pick").showModal();
+}
+
+// ── Import from a browser export ──
+// The window only picks the file; the backend reads it, so the passwords never enter the page.
+
+const EXPORT_STEPS = [
+  ["Chrome", "chrome://password-manager/settings", "ייצוא סיסמאות"],
+  ["Edge", "edge://wallet/passwords", "⋯ ← ייצוא סיסמאות"],
+  ["Firefox", "about:logins", "⋯ ← ייצוא סיסמאות"],
+];
+
+function openImport() {
+  const errEl = el("p", { className: "err", role: "alert" });
+  const choose = el("button", { type: "button", className: "primary", textContent: "בחירת קובץ CSV", onclick: async () => {
+    errEl.textContent = "";
+    const file = await window.__TAURI__.dialog.open({ multiple: false, directory: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
+    if (!file) return;
+    choose.disabled = true;
+    try {
+      const res = await kv("importCsv", { path: file });
+      await load();
+      importDone(res);
+    } catch (err) { errEl.textContent = err.message; choose.disabled = false; }
+  } });
+  dlg().replaceChildren(el("div", { className: "fields-wrap" },
+    el("h2", { textContent: "ייבוא סיסמאות מדפדפן" }),
+    el("p", { className: "muted", textContent: "מייצאים בדפדפן קובץ CSV, ובוחרים אותו כאן. כל שורה הופכת לפריט \"התחברות לאתר\"." }),
+    el("ol", { className: "steps" }, ...EXPORT_STEPS.map(([name, url, action]) =>
+      el("li", {}, el("strong", { textContent: name }), " — ", el("code", { dir: "ltr", textContent: url }), ` ← ${action}`))),
+    el("p", { className: "muted", textContent: "מתאים גם לקובצי ייצוא של Safari, 1Password, Bitwarden ו-LastPass." }),
+    errEl,
+    el("div", { className: "actions" },
+      el("button", { type: "button", textContent: "ביטול", onclick: () => dlg().close() }),
+      choose)));
+  if (!dlg().open) dlg().showModal();
+}
+
+function importDone(res) {
+  const parts = [`נוספו ${res.added} התחברויות`];
+  if (res.duplicates) parts.push(`${res.duplicates} כפילויות דולגו`);
+  if (res.skipped) parts.push(`${res.skipped} שורות בלי סיסמה דולגו`);
+  const del = el("button", { type: "button", className: "primary", textContent: "מחיקת הקובץ", onclick: safe(async () => {
+    await kv("importCleanup");
+    dlg().close();
+    toast("קובץ ה-CSV נמחק");
+  }) });
+  dlg().replaceChildren(el("div", { className: "fields-wrap" },
+    el("h2", { textContent: "הייבוא הסתיים" }),
+    el("p", { id: "importResult", textContent: parts.join(" · ") }),
+    el("p", { className: "muted" }, "הקובץ ", el("code", { dir: "ltr", textContent: res.file }), " מכיל את כל הסיסמאות בטקסט גלוי. מומלץ למחוק אותו עכשיו."),
+    el("div", { className: "actions" },
+      el("button", { type: "button", textContent: "להשאיר את הקובץ", onclick: () => dlg().close() }),
+      del)));
+  cat = "login";
+  render();
 }
 
 // ── Dev key ──

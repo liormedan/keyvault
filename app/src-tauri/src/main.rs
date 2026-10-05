@@ -103,6 +103,7 @@ async fn kv(app: AppHandle, state: State<'_, AppState>, method: String, params: 
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![kv])
         .run(tauri::generate_context!())

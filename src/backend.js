@@ -1,9 +1,12 @@
 // Backend for the desktop app: one JSON request per line on stdin, one JSON reply per line on stdout.
 // No port, no network — only the pipe to the Tauri process. Values are never written to stderr or logs.
 // Auto-lock after 15 idle minutes (the key is wiped from memory; the process stays).
+import fs from "node:fs";
+import path from "node:path";
 import readline from "node:readline";
 import { randomPassword, wipe } from "./crypto.js";
 import * as dpapi from "./dpapi.js";
+import { readLoginsFile } from "./import-csv.js";
 import { copyWithClear } from "./io.js";
 import * as store from "./store.js";
 import { TYPES } from "./types.js";
@@ -11,6 +14,7 @@ import { TYPES } from "./types.js";
 const IDLE_MS = 15 * 60 * 1000;
 let session = null; // { key, data }
 let idle;
+let lastImport = null; // path of the CSV just imported — the only file importCleanup may delete
 
 function lock() {
   if (session) wipe(session.key);
@@ -123,6 +127,24 @@ const methods = {
     const { key, data } = need();
     store.deleteItem(data, id);
     await store.save(key, data);
+    return { ok: true };
+  },
+
+  // Import a browser password export. The window sends only the path; values never reach it.
+  async importCsv({ path: file }) {
+    const { key, data } = need();
+    file = String(file || "");
+    const { logins, skipped } = readLoginsFile(file);
+    const { added, duplicates } = store.importLogins(data, logins);
+    if (added) await store.save(key, data);
+    lastImport = file;
+    return { added, duplicates, skipped, file: path.basename(file) };
+  },
+
+  importCleanup() {
+    if (!lastImport) throw new Error("אין קובץ למחיקה");
+    fs.rmSync(lastImport, { force: true });
+    lastImport = null;
     return { ok: true };
   },
 

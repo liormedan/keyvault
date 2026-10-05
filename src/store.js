@@ -164,3 +164,20 @@ export function deleteItem(data, id) {
   getItem(data, id);
   delete data.items[String(id)];
 }
+
+// Bulk import of logins (browser CSV). An entry identical to an existing login
+// (same URL, username and password) is skipped. Returns counts only.
+export function importLogins(data, logins) {
+  const sig = (f) => `${f.url || ""}\n${f.username || ""}\n${f.password || ""}`;
+  const seen = new Set(Object.values(data.items).filter((it) => it.type === "login").map((it) => sig(it.fields)));
+  let added = 0;
+  let duplicates = 0;
+  for (const l of logins) {
+    const key = sig(l.fields);
+    if (seen.has(key)) { duplicates++; continue; }
+    saveItem(data, { type: "login", title: l.title, fields: l.fields });
+    seen.add(key);
+    added++;
+  }
+  return { added, duplicates };
+}

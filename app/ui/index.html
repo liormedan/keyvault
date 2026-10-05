@@ -78,6 +78,13 @@
     <div class="actions"><button value="cancel" formnovalidate>ביטול</button><button class="primary" value="ok">שמירה</button></div>
   </form>
 </dialog>
+<!-- Confirmation (in-page: window.confirm is not reliable inside the webview) -->
+<dialog id="confirmDlg">
+  <form method="dialog">
+    <p id="confirmText"></p>
+    <div class="actions"><button value="cancel">ביטול</button><button class="danger" value="ok">מחיקה</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="app.js"></script>

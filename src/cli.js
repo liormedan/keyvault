@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import * as dpapi from "./dpapi.js";
+import { readLoginsFile } from "./import-csv.js";
 import { copyWithClear, readHidden, readStdin } from "./io.js";
 import * as store from "./store.js";
 
@@ -17,6 +18,7 @@ const HELP = `kv — כספת מקומית למפתחות
   kv rm   <פרויקט/מפתח>          מחיקה
   kv run  <פרויקט> -- <פקודה>     הרצת פקודה עם מפתחות הפרויקט כמשתני סביבה
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
+  kv import-passwords <קובץ.csv> [--delete]   ייבוא סיסמאות מקובץ ייצוא של דפדפן (Chrome / Edge / Firefox)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)
   kv unlock --remember           זכירת הכספת למשתמש הזה ב-Windows (בלי להקליד סיסמה כל פעם)
   kv forget                      ביטול הזכירה
@@ -161,6 +163,23 @@ const commands = {
     err(`יובאו ${pairs.length} מפתחות ל-${p}: ${pairs.map(([k]) => k).join(", ")}`);
     if (empty.length) err(`דולגו (ריקים בקובץ): ${empty.join(", ")}`);
     err("הקובץ המקורי עדיין על הדיסק — מחק אותו אם אין בו צורך.");
+  },
+
+  async "import-passwords"() {
+    const del = has("--delete");
+    const file = args.shift();
+    if (!file) throw new Error("שימוש: kv import-passwords <קובץ.csv> [--delete]");
+    const { logins, skipped } = readLoginsFile(file);
+    const { key, data } = await unlock();
+    const { added, duplicates } = store.importLogins(data, logins);
+    if (added) await store.save(key, data);
+    err(`נוספו ${added} התחברויות. כפילויות שדולגו: ${duplicates}. שורות בלי סיסמה: ${skipped}.`);
+    if (del) {
+      fs.rmSync(file, { force: true });
+      err("קובץ ה-CSV נמחק.");
+    } else {
+      err("קובץ ה-CSV מכיל את הסיסמאות בטקסט גלוי — מחק אותו (או הרץ עם --delete).");
+    }
   },
 
   async unlock() {

@@ -13,6 +13,7 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 - **Desktop app** (Tauri 2) — dark or light theme, categories, search, favorites, reveal / copy / edit / delete, auto-lock after 15 idle minutes.
 - **Typed items** — login, credit card, bank account, identity document, Wi-Fi, server/SSH, software license, secure note — plus dev keys grouped by project.
 - **Secrets stay hidden** — secret fields never appear in lists and reach the window only when you click reveal. Copy goes straight to the clipboard and is cleared after 20 seconds.
+- **Import from browsers** — pick the password CSV exported by Chrome, Edge, Firefox or Safari (also Bitwarden, LastPass, 1Password). Duplicates are skipped, and the app offers to delete the plaintext export afterwards.
 - **Password generator** — 20 characters by default, randomness from libsodium.
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
 - **Remember me (Windows)** — the derived key, not the password, is stored with DPAPI so only your Windows user can unlock without typing.
@@ -42,6 +43,7 @@ kv copy my-app/API_KEY                    # to the clipboard, cleared after 20 s
 kv get my-app/API_KEY | vercel env add API_KEY production   # pipes only; refuses to print to a terminal
 kv run my-app -- npm run dev              # run with the project's keys as environment variables
 kv import my-app .env.local               # import an existing env file (empty values are skipped)
+kv import-passwords passwords.csv --delete   # logins from a browser export; --delete removes the plaintext CSV
 kv backup [dir]                           # dated encrypted copy (default: KV_BACKUP_DIR or ~/.keyvault/backups)
 kv passwd                                 # change the master password
 kv forget                                 # drop "remember me"
@@ -57,6 +59,8 @@ What it protects against: someone who gets the vault file (a backup, a synced fo
 - The vault file is safe to back up anywhere — without the master password it is ciphertext. Any change to it, including its header, fails decryption.
 - The desktop app talks to its backend over a pipe — no port, no network. The browser UI (`kv ui`) listens on 127.0.0.1 only, with a random port and token, Host/Origin checks, and shuts down after 15 idle minutes.
 - Values are never written to logs, error messages or command-line arguments.
+
+Importing from a browser goes through the browser's own export file on purpose: keyvault never reads a browser's password database directly.
 
 What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. There is no master-password recovery, no sync and no browser autofill.
 
@@ -76,6 +80,7 @@ Layout:
 | `src/crypto.js` | libsodium only: Argon2id, XChaCha20-Poly1305 with the header as additional data, password generator |
 | `src/store.js` | vault file: atomic writes + `.bak`, dev keys and typed items |
 | `src/types.js` | item types — fields, which are secret, what quick-copy copies |
+| `src/import-csv.js` | password CSV import — columns matched by name |
 | `src/backend.js` | desktop backend: JSON lines over stdin/stdout |
 | `src/cli.js` | the `kv` command |
 | `src/dpapi.js` | "remember me" via Windows DPAPI |
