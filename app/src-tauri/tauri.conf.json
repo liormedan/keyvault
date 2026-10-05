@@ -5,7 +5,7 @@
   "identifier": "com.liormedan.keyvault",
   "build": {
     "frontendDist": "../ui",
-    "beforeBuildCommand": "npm run build:backend"
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "withGlobalTauri": true,

@@ -21,13 +21,15 @@
   ],
   "type": "module",
   "bin": {
-    "kv": "src/cli.js"
+    "kv": "dist/cli.js"
   },
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.js",
+    "prepare": "node scripts/build.mjs",
     "app:build": "tauri build --no-bundle",
-    "app:installer": "tauri build",
-    "build:backend": "esbuild src/backend.js --bundle --platform=node --format=esm --target=node20 --outfile=app/src-tauri/resources/backend.mjs --log-level=warning --banner:js=\"import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);\""
+    "app:installer": "tauri build"
   },
   "engines": {
     "node": ">=20"
@@ -38,6 +40,13 @@
   "private": true,
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.1",
-    "esbuild": "^0.28.2"
-  }
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }

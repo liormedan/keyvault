@@ -5,5 +5,7 @@ node_modules/
 app/src-tauri/target/
 app/src-tauri/gen/
 app/src-tauri/resources/
+dist/
+app/ui/dist/
 CLAUDE.local.md
 *.local.md

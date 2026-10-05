@@ -24,14 +24,16 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/cli.js` | the `kv` command (`npm link`) |
 | `src/ui-server.js` + `src/ui.html` | browser UI for `kv ui`: 127.0.0.1, random port and token, Host/Origin checks |
 | `app/src-tauri/` | Tauri 2 shell: spawns `node backend.mjs` (bundled resource, `KV_BACKEND` override, source fallback in dev) and relays the `kv` command. No crypto |
-| `app/ui/` | the window — plain HTML/JS/CSS, CSP without inline script |
+| `app/ui/` | the window — HTML/CSS + scripts bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`), CSP without inline script |
+| `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
 | `test/` | `node:test` suites, each with its own temporary vault |
 
 ## Build
 
 ```bash
+npm run build            # scripts/build.mjs (esbuild): dist/cli.js, app/src-tauri/resources/backend.mjs, app/ui/dist/{head,app}.js
+npm run typecheck        # tsc --noEmit (TypeScript 7)
 npm test
-npm run build:backend    # esbuild → app/src-tauri/resources/backend.mjs (also runs before every Tauri build)
 npm run app:build        # app/src-tauri/target/release/keyvault.exe
 npm run app:installer    # NSIS installer
 ```

@@ -70,6 +70,8 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
 ## Development
 
 ```bash
+npm run build         # esbuild: dist/cli.js, the bundled backend, app/ui/dist/
+npm run typecheck     # tsc --noEmit
 npm test              # node:test suites against temporary vaults — never touches ~/.keyvault
 npm run app:build     # desktop app without the installer
 ```
@@ -89,7 +91,7 @@ Layout:
 | `app/ui/` | the window (plain HTML/JS/CSS, strict CSP, no build step) |
 | `app/src-tauri/` | the Tauri shell — starts the backend and relays requests; no crypto |
 
-The backend is bundled into a single file (`npm run build:backend`) and shipped inside the installer.
+`npm run build` bundles the CLI (`dist/cli.js`, what `kv` runs), the backend (shipped inside the installer) and the window's scripts (`app/ui/dist/`).
 
 ## License
 
