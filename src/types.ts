@@ -1,11 +1,12 @@
 // Item types. Single source of truth — the backend validates against it and the window builds its forms from it.
 // label / plural: { en, he }. secret: never sent in listings, hidden until revealed. generate: adds a "generate password" button. primary: what quick-copy copies.
 
-import { getLang } from "./i18n.js";
+import { getLang } from "./i18n.ts";
+import type { FieldDef, Item, ItemTypeName, TypeDef } from "./model.ts";
 
-const notes = { k: "notes", label: { en: "Notes", he: "הערות" }, kind: "multiline" };
+const notes: FieldDef = { k: "notes", label: { en: "Notes", he: "הערות" }, kind: "multiline" };
 
-export const TYPES = {
+export const TYPES: Record<ItemTypeName, TypeDef> = {
   login: {
     label: { en: "Login", he: "התחברות לאתר" },
     plural: { en: "Logins", he: "אתרים" },
@@ -107,7 +108,7 @@ export const TYPES = {
   },
 };
 
-const host = (url) => {
+const host = (url: string): string => {
   try {
     return new URL(/^[a-z]+:\/\//i.test(url) ? url : `https://${url}`).host;
   } catch {
@@ -116,7 +117,7 @@ const host = (url) => {
 };
 
 // Subtitle in the list — non-secret fields only (plus a card's last 4 digits)
-export function subtitle(item) {
+export function subtitle(item: Pick<Item, "type" | "fields">): string {
   const f = item.fields || {};
   switch (item.type) {
     case "login": return [f.username, f.url && host(f.url)].filter(Boolean).join(" · ");
@@ -124,7 +125,7 @@ export function subtitle(item) {
       const digits = String(f.number || "").replace(/\D/g, "");
       return [f.issuer, digits.length >= 4 && `•••• ${digits.slice(-4)}`, f.expiry].filter(Boolean).join(" · ");
     }
-    case "bank": return [f.bank, f.branch && `${fieldDef("bank", "branch").label[getLang()]} ${f.branch}`].filter(Boolean).join(" · ");
+    case "bank": return [f.bank, f.branch && `${fieldDef("bank", "branch")?.label[getLang()]} ${f.branch}`].filter(Boolean).join(" · ");
     case "identity": return f.fullName || "";
     case "wifi": return f.ssid || "";
     case "server": return f.host ? `${f.username ? `${f.username}@` : ""}${f.host}${f.port ? `:${f.port}` : ""}` : "";
@@ -133,6 +134,6 @@ export function subtitle(item) {
   }
 }
 
-export function fieldDef(type, k) {
+export function fieldDef(type: ItemTypeName, k: string): FieldDef | undefined {
   return TYPES[type]?.fields.find((f) => f.k === k);
 }

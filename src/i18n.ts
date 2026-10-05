@@ -4,13 +4,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Lang } from "./model.ts";
 
-export const LANGS = ["en", "he"];
+export const LANGS: readonly Lang[] = ["en", "he"];
 const HOME = process.env.KV_HOME || path.join(os.homedir(), ".keyvault");
 const CONFIG = path.join(HOME, "config.json");
 
-const M = {
-  en: {
+const EN = {
     "pw.empty": "Master password is empty",
     "pw.required": "Master password required",
     "pw.mismatch": "Passwords don't match",
@@ -124,9 +124,12 @@ Vault: {vault}`,
     "web.newValue": "New value",
     "web.saved": "Saved",
     "web.lockedNow": "The vault is locked. You can close the window.",
-  },
+};
 
-  he: {
+export type MessageKey = keyof typeof EN;
+
+// Hebrew must cover every English key — a missing one fails to compile
+const HE: Record<MessageKey, string> = {
     "pw.empty": "סיסמת אב ריקה",
     "pw.required": "נדרשת סיסמת אב",
     "pw.mismatch": "הסיסמאות לא תואמות",
@@ -240,10 +243,11 @@ Vault: {vault}`,
     "web.newValue": "ערך חדש",
     "web.saved": "נשמר",
     "web.lockedNow": "הכספת ננעלה. אפשר לסגור את החלון.",
-  },
 };
 
-function readConfig() {
+const M: Record<Lang, Record<MessageKey, string>> = { en: EN, he: HE };
+
+function readConfig(): { lang?: string } {
   try {
     return JSON.parse(fs.readFileSync(CONFIG, "utf8"));
   } catch {
@@ -251,28 +255,27 @@ function readConfig() {
   }
 }
 
-const valid = (l) => LANGS.includes(l);
-let lang = [process.env.KV_LANG, readConfig().lang].find(valid) || "en";
+const valid = (l: unknown): l is Lang => LANGS.includes(l as Lang);
+let lang: Lang = [process.env.KV_LANG, readConfig().lang].find(valid) ?? "en";
 
-export const getLang = () => lang;
+export const getLang = (): Lang => lang;
 
 // For this process only (the desktop backend follows the window's choice)
-export function setLang(l) {
+export function setLang(l: string): void {
   if (!valid(l)) throw new Error(t("lang.invalid", { lang: l }));
   lang = l;
 }
 
 // Persist as the default for the CLI
-export function saveLang(l) {
+export function saveLang(l: string): void {
   setLang(l);
   fs.mkdirSync(HOME, { recursive: true });
   fs.writeFileSync(CONFIG, JSON.stringify({ ...readConfig(), lang: l }, null, 1));
 }
 
-export function t(key, params = {}) {
-  const s = M[lang][key] ?? M.en[key] ?? key;
-  return s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
+export function t(key: MessageKey, params: Record<string, string | number> = {}): string {
+  return M[lang][key].replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m));
 }
 
 // The message table — for the browser UI page and for tests
-export const messages = (l = lang) => M[l];
+export const messages = (l: Lang = lang): Record<MessageKey, string> => M[l];

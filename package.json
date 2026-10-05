@@ -26,13 +26,13 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.js",
+    "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test test/*.test.js",
     "prepare": "node scripts/build.mjs",
     "app:build": "tauri build --no-bundle",
     "app:installer": "tauri build"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.6"
   },
   "dependencies": {
     "libsodium-wrappers-sumo": "0.8.4"

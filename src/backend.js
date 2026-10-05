@@ -4,13 +4,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { randomPassword, wipe } from "./crypto.js";
-import * as dpapi from "./dpapi.js";
-import { getLang, setLang, t } from "./i18n.js";
-import { readLoginsFile } from "./import-csv.js";
-import { copyWithClear } from "./io.js";
-import * as store from "./store.js";
-import { TYPES } from "./types.js";
+import { randomPassword, wipe } from "./crypto.ts";
+import * as dpapi from "./dpapi.ts";
+import { getLang, setLang, t } from "./i18n.ts";
+import { readLoginsFile } from "./import-csv.ts";
+import { copyWithClear } from "./io.ts";
+import * as store from "./store.ts";
+import { TYPES } from "./types.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
 let session = null; // { key, data }

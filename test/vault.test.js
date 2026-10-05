@@ -6,7 +6,7 @@ import { test } from "node:test";
 
 // Temporary vault — never the real one
 process.env.KV_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-test-"));
-const store = await import("../src/store.js");
+const store = await import("../src/store.ts");
 
 test("create, save and reopen with the right password", async () => {
   const { key, data } = await store.create("correct horse battery");

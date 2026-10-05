@@ -3,11 +3,11 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import * as dpapi from "./dpapi.js";
-import { saveLang, t } from "./i18n.js";
-import { readLoginsFile } from "./import-csv.js";
-import { copyWithClear, readHidden, readStdin } from "./io.js";
-import * as store from "./store.js";
+import * as dpapi from "./dpapi.ts";
+import { saveLang, t } from "./i18n.ts";
+import { readLoginsFile } from "./import-csv.ts";
+import { copyWithClear, readHidden, readStdin } from "./io.ts";
+import * as store from "./store.ts";
 
 
 

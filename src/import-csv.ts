@@ -2,14 +2,15 @@
 // or a password manager (Bitwarden, LastPass, 1Password). Columns are matched by name, not position.
 // The export is plaintext — values are parsed in memory and never logged or echoed.
 import fs from "node:fs";
-import { t } from "./i18n.js";
+import { t } from "./i18n.ts";
+import type { ImportedLogin } from "./model.ts";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
 // RFC 4180: quoted fields, "" as an escaped quote, commas and newlines inside quotes
-export function parseCsv(text) {
-  const rows = [];
-  let row = [];
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let field = "";
   let quoted = false;
   const s = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
@@ -31,7 +32,9 @@ export function parseCsv(text) {
   return rows.filter((r) => r.some((v) => v !== ""));
 }
 
-const ALIASES = {
+type Column = "title" | "url" | "username" | "password" | "notes" | "totp";
+
+const ALIASES: Record<Column, string[]> = {
   title: ["name", "title"],
   url: ["url", "login_uri", "website", "web site", "origin"],
   username: ["username", "login_username", "login name", "user"],
@@ -40,7 +43,7 @@ const ALIASES = {
   totp: ["totp", "otpauth", "login_totp"],
 };
 
-const hostOf = (url) => {
+const hostOf = (url: string): string => {
   try {
     return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`).host;
   } catch {
@@ -49,19 +52,19 @@ const hostOf = (url) => {
 };
 
 // → { logins: [{ title, fields }], skipped } — rows without a password are skipped
-export function csvToLogins(text) {
+export function csvToLogins(text: string): { logins: ImportedLogin[]; skipped: number } {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error(t("import.empty"));
   const header = rows[0].map((h) => h.trim().toLowerCase());
-  const col = {};
-  for (const [field, names] of Object.entries(ALIASES)) col[field] = header.findIndex((h) => names.includes(h));
+  const col = {} as Record<Column, number>;
+  for (const [field, names] of Object.entries(ALIASES) as [Column, string[]][]) col[field] = header.findIndex((h) => names.includes(h));
   if (col.password < 0 || (col.url < 0 && col.title < 0)) {
     throw new Error(t("import.columns"));
   }
-  const logins = [];
+  const logins: ImportedLogin[] = [];
   let skipped = 0;
   for (const r of rows.slice(1)) {
-    const get = (f) => (col[f] >= 0 ? (r[col[f]] ?? "") : "");
+    const get = (f: Column) => (col[f] >= 0 ? (r[col[f]] ?? "") : "");
     const password = get("password");
     if (!password) { skipped++; continue; }
     const url = get("url").trim();
@@ -73,8 +76,8 @@ export function csvToLogins(text) {
   return { logins, skipped };
 }
 
-export function readLoginsFile(file) {
-  let st;
+export function readLoginsFile(file: string): { logins: ImportedLogin[]; skipped: number } {
+  let st: fs.Stats;
   try {
     st = fs.statSync(file);
   } catch {

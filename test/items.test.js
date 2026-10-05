@@ -6,9 +6,9 @@ import { test } from "node:test";
 
 // Temporary vault — never the real one
 process.env.KV_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-items-"));
-const store = await import("../src/store.js");
-const { randomPassword } = await import("../src/crypto.js");
-const { TYPES } = await import("../src/types.js");
+const store = await import("../src/store.ts");
+const { randomPassword } = await import("../src/crypto.ts");
+const { TYPES } = await import("../src/types.ts");
 const PW = "items test";
 
 test("a vault without items opens and gets an empty items map", async () => {

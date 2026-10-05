@@ -20,7 +20,7 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 
 ## Install
 
-Requirements: Windows 10/11 and [Node.js](https://nodejs.org/) 20 or newer.
+Requirements: Windows 10/11 and [Node.js](https://nodejs.org/) 22.6 or newer.
 
 ```bash
 git clone https://github.com/liormedan/keyvault.git
@@ -80,14 +80,14 @@ Layout:
 
 | Path | What |
 |---|---|
-| `src/crypto.js` | libsodium only: Argon2id, XChaCha20-Poly1305 with the header as additional data, password generator |
-| `src/store.js` | vault file: atomic writes + `.bak`, dev keys and typed items |
-| `src/types.js` | item types — fields, which are secret, what quick-copy copies |
-| `src/import-csv.js` | password CSV import — columns matched by name |
+| `src/crypto.ts` | libsodium only: Argon2id, XChaCha20-Poly1305 with the header as additional data, password generator |
+| `src/store.ts` | vault file: atomic writes + `.bak`, dev keys and typed items |
+| `src/types.ts` | item types — fields, which are secret, what quick-copy copies |
+| `src/import-csv.ts` | password CSV import — columns matched by name |
 | `src/backend.js` | desktop backend: JSON lines over stdin/stdout |
 | `src/cli.js` | the `kv` command |
-| `src/i18n.js`, `app/ui/i18n.js` | English and Hebrew strings — backend/CLI and the window |
-| `src/dpapi.js` | "remember me" via Windows DPAPI |
+| `src/i18n.ts`, `app/ui/i18n.js` | English and Hebrew strings — backend/CLI and the window |
+| `src/dpapi.ts` | "remember me" via Windows DPAPI |
 | `app/ui/` | the window (plain HTML/JS/CSS, strict CSP, no build step) |
 | `app/src-tauri/` | the Tauri shell — starts the backend and relays requests; no crypto |
 

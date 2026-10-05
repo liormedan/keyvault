@@ -7,12 +7,15 @@ import readline from "node:readline";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+// The backend and CLI import .ts modules; Node runs them with type stripping
+const NODE_TS = ["--experimental-strip-types", "--no-warnings=ExperimentalWarning"];
+
 // The desktop backend against a temporary vault — never the real one
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-"));
 const PW = "backend test password";
 
 function start() {
-  const child = spawn(process.execPath, [fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
+  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -75,7 +78,7 @@ test("app backend: closing stdin finishes a pending save before exiting", async 
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-close-"));
   const script = fileURLToPath(new URL("../src/backend.js", import.meta.url));
   const run = (lines) => new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], { env: { ...process.env, KV_HOME: home }, stdio: ["pipe", "pipe", "ignore"] });
+    const child = spawn(process.execPath, [...NODE_TS, script], { env: { ...process.env, KV_HOME: home }, stdio: ["pipe", "pipe", "ignore"] });
     let out = "";
     child.stdout.on("data", (c) => (out += c));
     child.on("exit", () => resolve(out.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))));
@@ -108,7 +111,7 @@ test("cli: English by default, Hebrew with KV_LANG or kv lang", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-lang-"));
   const cli = fileURLToPath(new URL("../src/cli.js", import.meta.url));
   const run = (args, env = {}) => new Promise((resolve) => {
-    const c = spawn(process.execPath, [cli, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    const c = spawn(process.execPath, [...NODE_TS, cli, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     c.stdout.on("data", (d) => (out += d));
     c.stderr.on("data", (d) => (out += d));
