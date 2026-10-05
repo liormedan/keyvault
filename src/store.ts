@@ -4,21 +4,27 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { deriveKey, newKdfParams, open, seal } from "./crypto.js";
-import { t } from "./i18n.js";
-import { TYPES, subtitle } from "./types.js";
+import { deriveKey, newKdfParams, open, seal } from "./crypto.ts";
+import { t } from "./i18n.ts";
+import type { DevEntry, Fields, ImportedLogin, Item, ItemTypeName, ListedDevKey, ListedItem, MaskedField, MaskedItem, VaultData, VaultFile, VaultHeader } from "./model.ts";
+import { TYPES, subtitle } from "./types.ts";
+
+export interface Session {
+  key: Uint8Array;
+  data: VaultData;
+}
 
 export const HOME = process.env.KV_HOME || path.join(os.homedir(), ".keyvault");
 export const VAULT = path.join(HOME, "vault.kv");
 
-export const exists = () => fs.existsSync(VAULT);
+export const exists = (): boolean => fs.existsSync(VAULT);
 
-export function readFile() {
+export function readFile(): VaultFile {
   if (!exists()) throw new Error(t("vault.none", { path: VAULT }));
-  return JSON.parse(fs.readFileSync(VAULT, "utf8"));
+  return JSON.parse(fs.readFileSync(VAULT, "utf8")) as VaultFile;
 }
 
-function writeFile(obj) {
+function writeFile(obj: VaultFile): void {
   fs.mkdirSync(HOME, { recursive: true });
   const tmp = `${VAULT}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 1), { mode: 0o600 });
@@ -26,71 +32,71 @@ function writeFile(obj) {
   fs.renameSync(tmp, VAULT);
 }
 
-const headerOf = (file) => ({ v: file.v, kdf: file.kdf });
+const headerOf = (file: VaultFile): VaultHeader => ({ v: file.v, kdf: file.kdf });
 
-export async function create(password) {
+export async function create(password: string): Promise<Session> {
   if (exists()) throw new Error(t("vault.exists", { path: VAULT }));
-  const header = { v: 1, kdf: await newKdfParams() };
+  const header: VaultHeader = { v: 1, kdf: await newKdfParams() };
   const key = await deriveKey(password, header.kdf);
-  const data = { created: new Date().toISOString(), projects: {}, items: {} };
+  const data: VaultData = { created: new Date().toISOString(), projects: {}, items: {} };
   writeFile(await seal(key, data, header));
   return { key, data };
 }
 
-export async function unlockWithPassword(password) {
+export async function unlockWithPassword(password: string): Promise<Session> {
   const file = readFile();
   const key = await deriveKey(password, file.kdf);
-  const data = normalize(await open(key, file));
+  const data = normalize(await open<Partial<VaultData>>(key, file));
   return { key, data };
 }
 
-export async function unlockWithKey(key) {
+export async function unlockWithKey(key: Uint8Array): Promise<Session> {
   const file = readFile();
-  return { key, data: normalize(await open(key, file)) };
+  return { key, data: normalize(await open<Partial<VaultData>>(key, file)) };
 }
 
-export async function save(key, data) {
+export async function save(key: Uint8Array, data: VaultData): Promise<void> {
   const file = readFile();
   writeFile(await seal(key, data, headerOf(file)));
 }
 
-export const salt = () => readFile().kdf.salt;
+export const salt = (): string => readFile().kdf.salt;
 
 // Vaults created before typed items have no `items`. Additive only — the file is unchanged until the next save.
-function normalize(data) {
+function normalize(data: Partial<VaultData>): VaultData {
   data.projects ??= {};
   data.items ??= {};
-  return data;
+  return data as VaultData;
 }
 
 // "project/KEY" → ["project", "KEY"]
-export function parseRef(ref) {
+export function parseRef(ref: string | undefined): [string, string] {
   const i = String(ref || "").indexOf("/");
-  if (i <= 0 || i === ref.length - 1) throw new Error(t("ref.invalid", { ref }));
+  if (!ref || i <= 0 || i === ref.length - 1) throw new Error(t("ref.invalid", { ref: String(ref ?? "") }));
   return [ref.slice(0, i), ref.slice(i + 1)];
 }
 
-export function getEntry(data, project, name) {
+export function getEntry(data: VaultData, project: string, name: string): DevEntry {
   const e = data.projects[project]?.[name];
   if (!e) throw new Error(t("entry.notFound", { ref: `${project}/${name}` }));
   return e;
 }
 
-export function setEntry(data, project, name, value, note) {
+export function setEntry(data: VaultData, project: string, name: string, value: string, note?: string): void {
   data.projects[project] ??= {};
   const prev = data.projects[project][name];
   data.projects[project][name] = { value, note: note ?? prev?.note ?? "", updated: new Date().toISOString() };
 }
 
-export function deleteEntry(data, project, name) {
+export function deleteEntry(data: VaultData, project: string, name: string): void {
   getEntry(data, project, name);
   delete data.projects[project][name];
   if (!Object.keys(data.projects[project]).length) delete data.projects[project];
 }
 
 // Listing without values — safe to display
-export function listing(data) {
-  const out = {};
+export function listing(data: VaultData): Record<string, ListedDevKey[]> {
+  const out: Record<string, ListedDevKey[]> = {};
   for (const [p, keys] of Object.entries(data.projects)) {
     out[p] = Object.entries(keys)
       .map(([k, e]) => ({ key: k, note: e.note, updated: e.updated }))
@@ -105,22 +111,22 @@ export function listing(data) {
 const MAX_FIELD = 20_000;
 
 // Listing without secret fields — title and subtitle only
-export function listItems(data) {
+export function listItems(data: VaultData): ListedItem[] {
   return Object.values(data.items)
     .map((it) => ({ id: it.id, type: it.type, title: it.title, sub: subtitle(it), fav: !!it.fav, updated: it.updated }))
     .sort((a, b) => a.title.localeCompare(b.title, "he"));
 }
 
-export function getItem(data, id) {
+export function getItem(data: VaultData, id: string): Item {
   const it = data.items[String(id)];
   if (!it) throw new Error(t("item.notFound"));
   return it;
 }
 
 // The item with secret fields masked: { k: { secret: true } }
-export function maskedItem(data, id) {
+export function maskedItem(data: VaultData, id: string): MaskedItem {
   const it = getItem(data, id);
-  const fields = {};
+  const fields: Record<string, MaskedField> = {};
   for (const f of TYPES[it.type].fields) {
     const v = it.fields[f.k];
     if (v == null || v === "") continue;
@@ -129,21 +135,23 @@ export function maskedItem(data, id) {
   return { ...it, fields };
 }
 
-export function itemValue(data, id, k) {
+export function itemValue(data: VaultData, id: string, k: string): string {
   const it = getItem(data, id);
   const v = it.fields[String(k)];
   if (v == null || v === "") throw new Error(t("item.fieldEmpty"));
   return v;
 }
 
-export function saveItem(data, { id, type, title, fields }) {
-  const prev = id ? getItem(data, id) : null;
-  type = prev ? prev.type : String(type || "");
-  const def = TYPES[type];
+export function saveItem(data: VaultData, input: { id?: string; type?: string; title?: string; fields?: Partial<Fields> }): string {
+  const prev = input.id ? getItem(data, input.id) : null;
+  const type = (prev ? prev.type : String(input.type || "")) as ItemTypeName;
+  // Params come from the window (JSON), so the type is checked at runtime too
+  const def = Object.hasOwn(TYPES, type) ? TYPES[type] : undefined;
   if (!def) throw new Error(t("item.unknownType", { type }));
-  title = String(title || "").trim();
+  const title = String(input.title || "").trim();
   if (!title) throw new Error(t("item.noTitle"));
-  const clean = {};
+  const fields = input.fields;
+  const clean: Fields = {};
   for (const f of def.fields) {
     const v = fields?.[f.k];
     if (v == null) continue;
@@ -152,24 +160,24 @@ export function saveItem(data, { id, type, title, fields }) {
     if (str.trim() !== "") clean[f.k] = f.kind === "multiline" ? str : str.trim();
   }
   const now = new Date().toISOString();
-  const item = { id: prev?.id || randomUUID(), type, title, fields: clean, fav: prev?.fav || false, created: prev?.created || now, updated: now };
+  const item: Item = { id: prev?.id || randomUUID(), type, title, fields: clean, fav: prev?.fav || false, created: prev?.created || now, updated: now };
   data.items[item.id] = item;
   return item.id;
 }
 
-export function setFav(data, id, fav) {
+export function setFav(data: VaultData, id: string, fav: boolean): void {
   getItem(data, id).fav = !!fav;
 }
 
-export function deleteItem(data, id) {
+export function deleteItem(data: VaultData, id: string): void {
   getItem(data, id);
   delete data.items[String(id)];
 }
 
 // Bulk import of logins (browser CSV). An entry identical to an existing login
 // (same URL, username and password) is skipped. Returns counts only.
-export function importLogins(data, logins) {
-  const sig = (f) => `${f.url || ""}\n${f.username || ""}\n${f.password || ""}`;
+export function importLogins(data: VaultData, logins: ImportedLogin[]): { added: number; duplicates: number } {
+  const sig = (f: Fields) => `${f.url || ""}\n${f.username || ""}\n${f.password || ""}`;
   const seen = new Set(Object.values(data.items).filter((it) => it.type === "login").map((it) => sig(it.fields)));
   let added = 0;
   let duplicates = 0;

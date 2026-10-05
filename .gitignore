@@ -9,3 +9,4 @@ dist/
 app/ui/dist/
 CLAUDE.local.md
 *.local.md
+!test/fixtures/*.kv

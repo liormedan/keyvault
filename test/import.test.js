@@ -7,11 +7,14 @@ import readline from "node:readline";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+// The backend and CLI import .ts modules; Node runs them with type stripping
+const NODE_TS = ["--experimental-strip-types", "--no-warnings=ExperimentalWarning"];
+
 // Temporary vault — never the real one. All CSV data here is made up.
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-import-"));
 process.env.KV_HOME = HOME;
-const store = await import("../src/store.js");
-const { parseCsv, csvToLogins } = await import("../src/import-csv.js");
+const store = await import("../src/store.ts");
+const { parseCsv, csvToLogins } = await import("../src/import-csv.ts");
 const PW = "import test";
 
 const CHROME = [
@@ -71,7 +74,7 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
   const other = path.join(HOME, "keep.txt");
   fs.writeFileSync(csv, FIREFOX + '\n"https://new.example","dana","pw-new",,"","{3}","1","2","3"\n');
   fs.writeFileSync(other, "keep");
-  const child = spawn(process.execPath, [fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
+  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });

@@ -1,10 +1,13 @@
 // Encryption — libsodium primitives only, no home-made crypto.
 // Key derivation: Argon2id (crypto_pwhash). Encryption: XChaCha20-Poly1305 (AEAD) — any change to the file fails decryption.
 import _sodium from "libsodium-wrappers-sumo";
-import { t } from "./i18n.js";
+import { t } from "./i18n.ts";
+import type { KdfParams, VaultFile, VaultHeader } from "./model.ts";
 
-let sodium;
-export async function ready() {
+type Sodium = typeof _sodium;
+
+let sodium: Sodium | undefined;
+export async function ready(): Promise<Sodium> {
   if (!sodium) {
     await _sodium.ready;
     sodium = _sodium;
@@ -13,7 +16,7 @@ export async function ready() {
 }
 
 // Argon2id parameters: libsodium MODERATE (~256MB, ~1s) — expensive to brute-force, tolerable on unlock.
-export async function newKdfParams() {
+export async function newKdfParams(): Promise<KdfParams> {
   const s = await ready();
   return {
     alg: "argon2id13",
@@ -23,7 +26,7 @@ export async function newKdfParams() {
   };
 }
 
-export async function deriveKey(password, kdf) {
+export async function deriveKey(password: string, kdf: KdfParams): Promise<Uint8Array> {
   const s = await ready();
   if (kdf.alg !== "argon2id13") throw new Error(t("kdf.unknown", { alg: kdf.alg }));
   return s.crypto_pwhash(
@@ -37,20 +40,20 @@ export async function deriveKey(password, kdf) {
 }
 
 // The header (version + KDF params) is bound as additional data — it cannot be swapped without failing decryption.
-export async function seal(key, plaintextObj, header) {
+export async function seal(key: Uint8Array, plaintextObj: unknown, header: VaultHeader): Promise<VaultFile> {
   const s = await ready();
   const nonce = s.randombytes_buf(s.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
   const ad = s.from_string(JSON.stringify(header));
   const ct = s.crypto_aead_xchacha20poly1305_ietf_encrypt(s.from_string(JSON.stringify(plaintextObj)), ad, null, nonce, key);
-  const b64 = (u) => s.to_base64(u, s.base64_variants.ORIGINAL);
+  const b64 = (u: Uint8Array) => s.to_base64(u, s.base64_variants.ORIGINAL);
   return { ...header, nonce: b64(nonce), ct: b64(ct) };
 }
 
-export async function open(key, file) {
+export async function open<T>(key: Uint8Array, file: VaultFile): Promise<T> {
   const s = await ready();
   const { nonce, ct, ...header } = file;
   const ad = s.from_string(JSON.stringify(header));
-  let pt;
+  let pt: Uint8Array;
   try {
     pt = s.crypto_aead_xchacha20poly1305_ietf_decrypt(
       null,
@@ -62,16 +65,16 @@ export async function open(key, file) {
   } catch {
     throw new Error(t("pw.wrong"));
   }
-  return JSON.parse(s.to_string(pt));
+  return JSON.parse(s.to_string(pt)) as T;
 }
 
-export async function wipe(buf) {
+export async function wipe(buf: Uint8Array | null | undefined): Promise<void> {
   const s = await ready();
   if (buf) s.memzero(buf);
 }
 
 // Random password — randomness from libsodium (randombytes_uniform, unbiased). At least one character from each set.
-export async function randomPassword(length = 20, { symbols = true } = {}) {
+export async function randomPassword(length: number = 20, { symbols = true }: { symbols?: boolean } = {}): Promise<string> {
   const s = await ready();
   const sets = ["abcdefghijkmnopqrstuvwxyz", "ABCDEFGHJKLMNPQRSTUVWXYZ", "23456789"];
   if (symbols) sets.push("!@#$%^&*-_=+?");

@@ -5,8 +5,8 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
-import { getLang, messages, t } from "./i18n.js";
-import * as store from "./store.js";
+import { getLang, messages, t } from "./i18n.ts";
+import * as store from "./store.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
 const TEMPLATE = fs.readFileSync(new URL("./ui.html", import.meta.url), "utf8");
