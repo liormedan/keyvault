@@ -5,36 +5,38 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
-import { getLang, messages, t } from "./i18n.ts";
+import type { AddressInfo } from "node:net";
+import { getLang, messages, t, type MessageKey } from "./i18n.ts";
 import * as store from "./store.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
 const TEMPLATE = fs.readFileSync(new URL("./ui.html", import.meta.url), "utf8");
-const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ESC[c]!);
 
 // The page in the current language: {{key}} → escaped text, {{T}} → the web.* strings as JSON for the script
-function page() {
+function page(): string {
   const m = messages();
   const web = Object.fromEntries(Object.entries(m).filter(([k]) => k.startsWith("web.")));
-  return TEMPLATE.replace(/\{\{([\w.]+)\}\}/g, (_, k) => {
+  return TEMPLATE.replace(/\{\{([\w.]+)\}\}/g, (_, k: string) => {
     if (k === "lang") return getLang();
     if (k === "dir") return getLang() === "he" ? "rtl" : "ltr";
     if (k === "T") return JSON.stringify(web).replace(/</g, "\\u003c");
-    return esc(t(k));
+    return esc(t(k as MessageKey));
   });
 }
 
-export function startUi({ key, data }) {
+export function startUi({ key, data }: store.Session): Promise<string> {
   const token = randomBytes(24).toString("hex");
   const tokenBuf = Buffer.from(token);
-  let idle;
+  let idle: NodeJS.Timeout | undefined;
   const bump = () => {
     clearTimeout(idle);
     idle = setTimeout(() => shutdown(t("ui.idle")), IDLE_MS);
   };
 
   const server = http.createServer(async (req, res) => {
-    const send = (status, body, type = "application/json; charset=utf-8") => {
+    const send = (status: number, body: unknown, type = "application/json; charset=utf-8") => {
       res.writeHead(status, {
         "Content-Type": type,
         "Cache-Control": "no-store",
@@ -45,9 +47,9 @@ export function startUi({ key, data }) {
       res.end(typeof body === "string" ? body : JSON.stringify(body));
     };
 
-    const { port } = server.address();
+    const { port } = server.address() as AddressInfo;
     if (req.headers.host !== `127.0.0.1:${port}`) return send(403, { error: "host" });
-    const url = new URL(req.url, `http://127.0.0.1:${port}`);
+    const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
 
     if (req.method === "GET" && url.pathname === "/") return send(200, page(), "text/html; charset=utf-8");
     if (!url.pathname.startsWith("/api/")) return send(404, { error: "not found" });
@@ -58,7 +60,7 @@ export function startUi({ key, data }) {
     bump();
 
     try {
-      let body = {};
+      let body: { p?: unknown; k?: unknown; value?: unknown; note?: unknown } = {};
       if (req.method === "POST") {
         let raw = "";
         for await (const c of req) {
@@ -72,7 +74,7 @@ export function startUi({ key, data }) {
         case "GET /api/list":
           return send(200, { vault: store.VAULT, projects: store.listing(data) });
         case "GET /api/value":
-          return send(200, { value: store.getEntry(data, url.searchParams.get("p"), url.searchParams.get("k")).value });
+          return send(200, { value: store.getEntry(data, url.searchParams.get("p") ?? "", url.searchParams.get("k") ?? "").value });
         case "POST /api/set": {
           const p = String(body.p || "").trim();
           const k = String(body.k || "").trim();
@@ -92,11 +94,11 @@ export function startUi({ key, data }) {
           return send(404, { error: "not found" });
       }
     } catch (e) {
-      return send(400, { error: e.message });
+      return send(400, { error: (e as Error).message });
     }
   });
 
-  function shutdown(reason) {
+  function shutdown(reason: string): void {
     process.stderr.write(`kv ui: ${reason}\n`);
     server.close();
     server.closeAllConnections?.();
@@ -105,7 +107,7 @@ export function startUi({ key, data }) {
 
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
+      const { port } = server.address() as AddressInfo;
       // The token is in the fragment (#) — never sent to the server or logged in request history
       const url = `http://127.0.0.1:${port}/#${token}`;
       process.stderr.write(`${t("ui.open", { url })}\n`);

@@ -27,7 +27,7 @@ impl Drop for Backend {
 struct AppState(Mutex<Option<Backend>>);
 
 // Order: KV_BACKEND (override) → the bundled backend.mjs shipped with the installer →
-// src/backend.js in the source tree (development builds)
+// the bundle in the source tree (`npm run build`, development builds)
 fn backend_script(app: &AppHandle) -> PathBuf {
     if let Ok(p) = std::env::var("KV_BACKEND") {
         return PathBuf::from(p);
@@ -38,7 +38,7 @@ fn backend_script(app: &AppHandle) -> PathBuf {
             return bundled;
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../src/backend.js")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/backend.mjs")
 }
 
 fn spawn(app: &AppHandle) -> Result<Backend, String> {

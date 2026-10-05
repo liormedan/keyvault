@@ -9,26 +9,24 @@ import { readLoginsFile } from "./import-csv.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
 import * as store from "./store.ts";
 
-
-
 const args = process.argv.slice(2);
 const cmd = args.shift();
-const flag = (name) => {
+const flag = (name: string): string | undefined => {
   const i = args.indexOf(name);
   if (i < 0) return undefined;
   const v = args[i + 1];
   args.splice(i, 2);
   return v;
 };
-const has = (name) => {
+const has = (name: string): boolean => {
   const i = args.indexOf(name);
   if (i < 0) return false;
   args.splice(i, 1);
   return true;
 };
-const err = (msg) => process.stderr.write(`${msg}\n`);
+const err = (msg: string) => process.stderr.write(`${msg}\n`);
 
-async function unlock() {
+async function unlock(): Promise<store.Session> {
   const cached = dpapi.recall(store.salt());
   if (cached) {
     try {
@@ -40,7 +38,7 @@ async function unlock() {
   return store.unlockWithPassword(await readHidden(t("cli.prompt.password")));
 }
 
-async function newPassword() {
+async function newPassword(): Promise<string> {
   const a = await readHidden(t("cli.prompt.new"));
   if (!a) throw new Error(t("pw.empty"));
   const b = await readHidden(t("cli.prompt.again"));
@@ -48,8 +46,8 @@ async function newPassword() {
   return a;
 }
 
-function parseEnv(text) {
-  const out = {};
+function parseEnv(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
   for (const line of text.split(/\r?\n/)) {
     const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
     if (!m) continue;
@@ -60,7 +58,7 @@ function parseEnv(text) {
   return out;
 }
 
-const commands = {
+const commands: Record<string, () => Promise<void>> = {
   async init() {
     const pw = await newPassword();
     await store.create(pw);
@@ -100,7 +98,10 @@ const commands = {
     const { data } = await unlock();
     const list = store.listing(data);
     const names = Object.keys(list).filter((p) => !only || p === only).sort();
-    if (!names.length) return err(only ? t("cli.noProject", { name: only }) : t("cli.empty"));
+    if (!names.length) {
+      err(only ? t("cli.noProject", { name: only }) : t("cli.empty"));
+      return;
+    }
     for (const p of names) {
       console.log(p);
       for (const e of list[p]) console.log(`  ${e.key}${e.note ? `  — ${e.note}` : ""}`);
@@ -123,14 +124,14 @@ const commands = {
     const { data } = await unlock();
     const keys = data.projects[p];
     if (!keys) throw new Error(t("cli.noProject", { name: p }));
-    const env = { ...process.env };
+    const env: NodeJS.ProcessEnv = { ...process.env };
     for (const [k, e] of Object.entries(keys)) env[k] = e.value;
     // On Windows a shell is needed to run pnpm.cmd / vercel.cmd, so pass one string, quoting arguments that contain spaces
     const win = process.platform === "win32";
-    const q = (a) => (/[\s"&|<>^()]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+    const q = (a: string) => (/[\s"&|<>^()]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
     const child = win
       ? spawn(command.map(q).join(" "), { stdio: "inherit", env, shell: true })
-      : spawn(command[0], command.slice(1), { stdio: "inherit", env });
+      : spawn(command[0]!, command.slice(1), { stdio: "inherit", env });
     child.on("exit", (code) => process.exit(code ?? 1));
   },
 
@@ -214,7 +215,7 @@ const commands = {
   },
 
   async ui() {
-    const { startUi } = await import("./ui-server.js");
+    const { startUi } = await import("./ui-server.ts");
     await startUi(await unlock());
   },
 };
@@ -222,12 +223,13 @@ const commands = {
 try {
   if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
     console.log(t("cli.help", { vault: store.VAULT }));
-  } else if (!commands[cmd]) {
+  } else if (!Object.hasOwn(commands, cmd)) {
+    // hasOwn: "toString" or "constructor" are not commands
     throw new Error(t("cli.unknownCommand", { cmd }));
   } else {
-    await commands[cmd]();
+    await commands[cmd]!();
   }
 } catch (e) {
-  err(`kv: ${e.message}`);
+  err(`kv: ${(e as Error).message}`);
   process.exit(1);
 }

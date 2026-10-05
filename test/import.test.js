@@ -74,7 +74,7 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
   const other = path.join(HOME, "keep.txt");
   fs.writeFileSync(csv, FIREFOX + '\n"https://new.example","dana","pw-new",,"","{3}","1","2","3"\n');
   fs.writeFileSync(other, "keep");
-  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
+  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.ts", import.meta.url))], {
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });

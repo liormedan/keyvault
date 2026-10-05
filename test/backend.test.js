@@ -15,7 +15,7 @@ const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-"));
 const PW = "backend test password";
 
 function start() {
-  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.js", import.meta.url))], {
+  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.ts", import.meta.url))], {
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -76,7 +76,7 @@ test("app backend: remember (DPAPI) in the temp folder", { skip: process.platfor
 
 test("app backend: closing stdin finishes a pending save before exiting", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-close-"));
-  const script = fileURLToPath(new URL("../src/backend.js", import.meta.url));
+  const script = fileURLToPath(new URL("../src/backend.ts", import.meta.url));
   const run = (lines) => new Promise((resolve) => {
     const child = spawn(process.execPath, [...NODE_TS, script], { env: { ...process.env, KV_HOME: home }, stdio: ["pipe", "pipe", "ignore"] });
     let out = "";
@@ -99,6 +99,8 @@ test("app backend: closing stdin finishes a pending save before exiting", async 
 test("app backend: setLang switches error messages to Hebrew and back", async () => {
   const b = start();
   assert.match((await b.call("nope")).error, /Unknown action/);
+  assert.match((await b.call("toString")).error, /Unknown action/, "prototype names are not methods");
+  assert.match((await b.call("constructor")).error, /Unknown action/);
   assert.equal((await b.call("setLang", { lang: "he" })).result.lang, "he");
   assert.match((await b.call("nope")).error, /פעולה לא מוכרת/);
   assert.match((await b.call("setLang", { lang: "fr" })).error, /שפה לא מוכרת/);
@@ -109,7 +111,7 @@ test("app backend: setLang switches error messages to Hebrew and back", async ()
 
 test("cli: English by default, Hebrew with KV_LANG or kv lang", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-lang-"));
-  const cli = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+  const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
   const run = (args, env = {}) => new Promise((resolve) => {
     const c = spawn(process.execPath, [...NODE_TS, cli, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
@@ -118,6 +120,7 @@ test("cli: English by default, Hebrew with KV_LANG or kv lang", async () => {
     c.on("exit", () => resolve(out));
   });
   assert.match(await run(["ls"]), /No vault at/);
+  assert.match(await run(["toString"]), /Unknown command: toString/, "prototype names are not commands");
   assert.match(await run(["ls"], { KV_LANG: "he" }), /אין כספת/);
   await run(["lang", "he"]);
   assert.match(await run(["ls"]), /אין כספת/, "kv lang he is remembered");

@@ -7,34 +7,37 @@ import readline from "node:readline";
 import { randomPassword, wipe } from "./crypto.ts";
 import * as dpapi from "./dpapi.ts";
 import { getLang, setLang, t } from "./i18n.ts";
+import type { Handlers, Method, Reply } from "./protocol.ts";
+import { LOCKED } from "./protocol.ts";
 import { readLoginsFile } from "./import-csv.ts";
 import { copyWithClear } from "./io.ts";
 import * as store from "./store.ts";
 import { TYPES } from "./types.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
-let session = null; // { key, data }
-let idle;
-let lastImport = null; // path of the CSV just imported — the only file importCleanup may delete
+let session: store.Session | null = null;
+let idle: NodeJS.Timeout | undefined;
+let lastImport: string | null = null; // path of the CSV just imported — the only file importCleanup may delete
 
-function lock() {
+function lock(): void {
   if (session) wipe(session.key);
   session = null;
   clearTimeout(idle);
 }
 
-function bump() {
+function bump(): void {
   clearTimeout(idle);
   idle = setTimeout(lock, IDLE_MS);
 }
 
-function need() {
-  if (!session) throw new Error("locked");
+function need(): store.Session {
+  if (!session) throw new Error(LOCKED);
   return session;
 }
 
-const str = (v) => String(v ?? "").trim();
+const str = (v: unknown) => String(v ?? "").trim();
 
+// Params arrive as JSON from the window, so values are still coerced with str() / String() at runtime.
 const methods = {
   // The window decides the language and tells the backend, so errors come back in the same language
   setLang: ({ lang }) => (setLang(String(lang)), { lang: getLang() }),
@@ -50,14 +53,14 @@ const methods = {
   async init({ password }) {
     if (!password) throw new Error(t("pw.empty"));
     session = await store.create(String(password));
-    return { ok: true };
+    return { ok: true as const };
   },
 
   async unlock({ password, remember }) {
     if (password) {
       session = await store.unlockWithPassword(String(password));
       if (remember) dpapi.remember(session.key, store.salt());
-      return { ok: true };
+      return { ok: true as const };
     }
     const cached = dpapi.recall(store.salt());
     if (!cached) throw new Error(t("pw.required"));
@@ -67,11 +70,11 @@ const methods = {
       dpapi.forget();
       throw new Error(t("remember.stale"));
     }
-    return { ok: true };
+    return { ok: true as const };
   },
 
-  lock: () => (lock(), { ok: true }),
-  forget: () => (dpapi.forget(), { ok: true }),
+  lock: () => (lock(), { ok: true as const }),
+  forget: () => (dpapi.forget(), { ok: true as const }),
 
   list: () => ({ projects: store.listing(need().data) }),
 
@@ -79,7 +82,7 @@ const methods = {
 
   copy({ p, k }) {
     copyWithClear(store.getEntry(need().data, str(p), str(k)).value, 20);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   async set({ p, k, value, note }) {
@@ -89,14 +92,14 @@ const methods = {
     if (!p || !k || p.includes("/") || !value) throw new Error(t("entry.missing"));
     store.setEntry(data, p, k, String(value), note == null ? undefined : String(note));
     await store.save(key, data);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   async delete({ p, k }) {
     const { key, data } = need();
     store.deleteEntry(data, str(p), str(k));
     await store.save(key, data);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   // ── Typed items ──
@@ -110,7 +113,7 @@ const methods = {
 
   itemCopy({ id, k }) {
     copyWithClear(store.itemValue(need().data, id, k), 20);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   async itemSave(params) {
@@ -124,14 +127,14 @@ const methods = {
     const { key, data } = need();
     store.setFav(data, id, fav);
     await store.save(key, data);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   async itemDelete({ id }) {
     const { key, data } = need();
     store.deleteItem(data, id);
     await store.save(key, data);
-    return { ok: true };
+    return { ok: true as const };
   },
 
   // Import a browser password export. The window sends only the path; values never reach it.
@@ -149,30 +152,31 @@ const methods = {
     if (!lastImport) throw new Error(t("import.noFile"));
     fs.rmSync(lastImport, { force: true });
     lastImport = null;
-    return { ok: true };
+    return { ok: true as const };
   },
 
   generate: async ({ length, symbols }) => ({ value: await randomPassword(length, { symbols: symbols !== false }) }),
-};
+} satisfies Handlers;
 
 const rl = readline.createInterface({ input: process.stdin });
-const reply = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`);
+const reply = (obj: Reply) => process.stdout.write(`${JSON.stringify(obj)}\n`);
 
 // Requests are handled one at a time, in order
 let queue = Promise.resolve();
 rl.on("line", (line) => {
   queue = queue.then(async () => {
-    let id = null;
+    let id: number | null = null;
     try {
-      const req = JSON.parse(line);
+      const req = JSON.parse(line) as { id?: number; method?: string; params?: unknown };
       id = req.id ?? null;
-      const fn = methods[req.method];
-      if (!fn) throw new Error(t("op.unknown", { name: req.method }));
+      // hasOwn: "toString" or "constructor" are not methods
+      if (typeof req.method !== "string" || !Object.hasOwn(methods, req.method)) throw new Error(t("op.unknown", { name: String(req.method) }));
+      const fn = methods[req.method as Method] as (p: unknown) => unknown;
       const result = await fn(req.params || {});
       if (session) bump();
       reply({ id, result });
     } catch (e) {
-      reply({ id, error: e.message });
+      reply({ id, error: (e as Error).message });
     }
   });
 });
