@@ -3,6 +3,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { t } from "./i18n.js";
 import { HOME } from "./store.js";
 
 const CACHE = path.join(HOME, "key.dpapi");
@@ -25,7 +26,7 @@ const UNPROTECT =
 export const supported = process.platform === "win32";
 
 export function remember(key, salt) {
-  if (!supported) throw new Error("זכירה זמינה רק ב-Windows");
+  if (!supported) throw new Error(t("remember.windowsOnly"));
   const blob = ps(PROTECT, Buffer.from(key).toString("base64"));
   fs.mkdirSync(HOME, { recursive: true });
   fs.writeFileSync(CACHE, JSON.stringify({ salt, blob }), { mode: 0o600 });

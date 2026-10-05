@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 // The desktop backend against a temporary vault — never the real one
@@ -16,6 +16,7 @@ function start() {
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });
+  after(() => child.kill());
   let stderr = "";
   child.stderr.on("data", (c) => (stderr += c));
   const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();
@@ -33,26 +34,26 @@ function start() {
 test("app backend: create, lock, unlock, CRUD, no values on stderr", async () => {
   const b = start();
   assert.equal((await b.call("status")).result.exists, false);
-  assert.match((await b.call("init", { password: "" })).error, /ריקה/);
+  assert.match((await b.call("init", { password: "" })).error, /empty/);
   assert.equal((await b.call("init", { password: PW })).result.ok, true);
 
   assert.equal((await b.call("set", { p: "demo", k: "API_KEY", value: "v-123", note: "n" })).result.ok, true);
-  assert.match((await b.call("set", { p: "a/b", k: "X", value: "1" })).error, /בלי \//);
+  assert.match((await b.call("set", { p: "a/b", k: "X", value: "1" })).error, /no \/ in the project name/);
   const list = (await b.call("list")).result.projects;
-  assert.deepEqual(Object.keys(list.demo[0]).sort(), ["key", "note", "updated"], "הרשימה בלי ערכים");
+  assert.deepEqual(Object.keys(list.demo[0]).sort(), ["key", "note", "updated"], "listing without values");
   assert.equal((await b.call("value", { p: "demo", k: "API_KEY" })).result.value, "v-123");
 
   await b.call("lock");
   assert.equal((await b.call("list")).error, "locked");
-  assert.match((await b.call("unlock", { password: "wrong password!!" })).error, /שגויה/);
+  assert.match((await b.call("unlock", { password: "wrong password!!" })).error, /Wrong master password/);
   assert.equal((await b.call("unlock", { password: PW })).result.ok, true);
   assert.equal((await b.call("value", { p: "demo", k: "API_KEY" })).result.value, "v-123");
 
   assert.equal((await b.call("delete", { p: "demo", k: "API_KEY" })).result.ok, true);
   assert.deepEqual((await b.call("list")).result.projects, {});
-  assert.match((await b.call("nope")).error, /לא מוכרת/);
+  assert.match((await b.call("nope")).error, /Unknown action/);
   b.stop();
-  assert.ok(!b.stderr().includes("v-123"), "הערך לא נכתב ל-stderr");
+  assert.ok(!b.stderr().includes("v-123"), "the value is not written to stderr");
 });
 
 test("app backend: remember (DPAPI) in the temp folder", { skip: process.platform !== "win32" }, async () => {
@@ -63,10 +64,10 @@ test("app backend: remember (DPAPI) in the temp folder", { skip: process.platfor
 
   const b = start();
   assert.equal((await b.call("status")).result.remembered, true);
-  assert.equal((await b.call("unlock", {})).result.ok, true, "נפתח בלי סיסמה");
+  assert.equal((await b.call("unlock", {})).result.ok, true, "opens without a password");
   await b.call("forget");
   await b.call("lock");
-  assert.match((await b.call("unlock", {})).error, /נדרשת סיסמת אב/);
+  assert.match((await b.call("unlock", {})).error, /Master password required/);
   b.stop();
 });
 
@@ -90,4 +91,34 @@ test("app backend: closing stdin finishes a pending save before exiting", async 
     { id: 2, method: "value", params: { p: "demo", k: "K" } },
   ]);
   assert.equal(second[1].result.value, "kept");
+});
+
+test("app backend: setLang switches error messages to Hebrew and back", async () => {
+  const b = start();
+  assert.match((await b.call("nope")).error, /Unknown action/);
+  assert.equal((await b.call("setLang", { lang: "he" })).result.lang, "he");
+  assert.match((await b.call("nope")).error, /פעולה לא מוכרת/);
+  assert.match((await b.call("setLang", { lang: "fr" })).error, /שפה לא מוכרת/);
+  await b.call("setLang", { lang: "en" });
+  assert.match((await b.call("nope")).error, /Unknown action/);
+  b.stop();
+});
+
+test("cli: English by default, Hebrew with KV_LANG or kv lang", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-lang-"));
+  const cli = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+  const run = (args, env = {}) => new Promise((resolve) => {
+    const c = spawn(process.execPath, [cli, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    c.stdout.on("data", (d) => (out += d));
+    c.stderr.on("data", (d) => (out += d));
+    c.on("exit", () => resolve(out));
+  });
+  assert.match(await run(["ls"]), /No vault at/);
+  assert.match(await run(["ls"], { KV_LANG: "he" }), /אין כספת/);
+  await run(["lang", "he"]);
+  assert.match(await run(["ls"]), /אין כספת/, "kv lang he is remembered");
+  assert.match(await run(["help"]), /כספת מקומית/);
+  await run(["lang", "en"]);
+  assert.match(await run(["help"]), /a local vault/);
 });

@@ -1,55 +1,57 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>כספת מפתחות</title>
+<title>Key vault</title>
 <link rel="stylesheet" href="style.css">
 <script src="theme.js"></script>
+<script src="i18n.js"></script>
 </head>
 <body>
 
 <!-- No vault yet: create -->
 <div class="gate" id="setup" hidden>
   <form class="card" id="setupForm">
-    <h1>כספת חדשה</h1>
-    <p class="muted">בחר סיסמת אב. <strong>אין דרך לשחזר אותה אם שוכחים.</strong></p>
-    <label>סיסמת אב <input name="a" type="password" required autocomplete="new-password" dir="ltr"></label>
-    <label>שוב, לאימות <input name="b" type="password" required autocomplete="new-password" dir="ltr"></label>
+    <h1 data-i18n="setup.title"></h1>
+    <p class="muted"><span data-i18n="setup.lead"></span> <strong data-i18n="setup.warn"></strong></p>
+    <label><span data-i18n="setup.password"></span> <input name="a" type="password" required autocomplete="new-password" dir="ltr"></label>
+    <label><span data-i18n="setup.again"></span> <input name="b" type="password" required autocomplete="new-password" dir="ltr"></label>
     <p class="err" id="setupErr" role="alert"></p>
-    <button class="primary" type="submit">יצירת כספת</button>
-    <button class="link theme-toggle" type="button"></button>
+    <button class="primary" type="submit" data-i18n="setup.create"></button>
+    <div class="gate-links"><button class="link theme-toggle" type="button"></button><button class="link lang-toggle" type="button"></button></div>
   </form>
 </div>
 
 <!-- Locked -->
 <div class="gate" id="unlock" hidden>
   <form class="card" id="unlockForm">
-    <h1>כספת מפתחות</h1>
-    <label>סיסמת אב <input name="pw" type="password" required autocomplete="current-password" dir="ltr"></label>
-    <label class="check" id="rememberRow"><input name="remember" type="checkbox"> זכור אותי במחשב הזה</label>
+    <h1 data-i18n="app.title"></h1>
+    <label><span data-i18n="unlock.password"></span> <input name="pw" type="password" required autocomplete="current-password" dir="ltr"></label>
+    <label class="check" id="rememberRow"><input name="remember" type="checkbox"> <span data-i18n="unlock.remember"></span></label>
     <p class="err" id="unlockErr" role="alert"></p>
-    <button class="primary" type="submit" id="unlockBtn">פתיחה</button>
-    <button class="link theme-toggle" type="button"></button>
+    <button class="primary" type="submit" id="unlockBtn" data-i18n="unlock.open"></button>
+    <div class="gate-links"><button class="link theme-toggle" type="button"></button><button class="link lang-toggle" type="button"></button></div>
   </form>
 </div>
 
 <!-- Unlocked -->
 <div id="main" hidden>
   <header>
-    <h1>כספת מפתחות</h1>
-    <input type="search" id="q" placeholder="חיפוש" aria-label="חיפוש">
-    <button class="primary" id="add">הוספה</button>
+    <h1 data-i18n="app.title"></h1>
+    <input type="search" id="q" data-i18n-placeholder="main.search" data-i18n-aria="main.search">
+    <button class="primary" id="add" data-i18n="main.add"></button>
     <button class="theme-toggle" type="button"></button>
-    <button id="lock">נעילה</button>
+    <button class="lang-toggle" type="button"></button>
+    <button id="lock" data-i18n="main.lock"></button>
   </header>
   <div class="layout">
-    <nav id="cats" aria-label="קטגוריות"></nav>
+    <nav id="cats" data-i18n-aria="main.categories"></nav>
     <main>
       <div id="list"></div>
       <footer>
         <span class="path" id="path"></span>
-        <button class="link" id="forget" hidden>ביטול הזכירה במחשב הזה</button>
+        <button class="link" id="forget" hidden data-i18n="main.forget"></button>
       </footer>
     </main>
   </div>
@@ -58,9 +60,9 @@
 <!-- Pick a type to add -->
 <dialog id="pick">
   <form method="dialog">
-    <h2>מה להוסיף?</h2>
+    <h2 data-i18n="pick.title"></h2>
     <div class="pick-grid" id="pickGrid"></div>
-    <div class="actions"><button value="cancel">ביטול</button></div>
+    <div class="actions"><button value="cancel" data-i18n="cancel"></button></div>
   </form>
 </dialog>
 
@@ -70,19 +72,20 @@
 <!-- Dev key -->
 <dialog id="dlg">
   <form method="dialog" id="form">
-    <h2 id="dlgTitle">הוספת מפתח פיתוח</h2>
-    <label>פרויקט <input name="p" required placeholder="my-app" dir="ltr"></label>
-    <label>שם המפתח <input name="k" required placeholder="SMTP_PASS" dir="ltr"></label>
-    <label>ערך <input name="value" type="password" required autocomplete="off" dir="ltr"></label>
-    <label>הערה (לא חובה) <input name="note" placeholder="למה זה משמש"></label>
-    <div class="actions"><button value="cancel" formnovalidate>ביטול</button><button class="primary" value="ok">שמירה</button></div>
+    <h2 id="dlgTitle"></h2>
+    <label><span data-i18n="dev.project"></span> <input name="p" required placeholder="my-app" dir="ltr"></label>
+    <label><span data-i18n="dev.key"></span> <input name="k" required placeholder="SMTP_PASS" dir="ltr"></label>
+    <label><span data-i18n="dev.value"></span> <input name="value" type="password" required autocomplete="off" dir="ltr"></label>
+    <label><span data-i18n="dev.note"></span> <input name="note" data-i18n-placeholder="dev.notePlaceholder"></label>
+    <div class="actions"><button value="cancel" formnovalidate data-i18n="cancel"></button><button class="primary" value="ok" data-i18n="save"></button></div>
   </form>
 </dialog>
+
 <!-- Confirmation (in-page: window.confirm is not reliable inside the webview) -->
 <dialog id="confirmDlg">
   <form method="dialog">
     <p id="confirmText"></p>
-    <div class="actions"><button value="cancel">ביטול</button><button class="danger" value="ok">מחיקה</button></div>
+    <div class="actions"><button value="cancel" data-i18n="cancel"></button><button class="danger" value="ok" data-i18n="delete"></button></div>
   </form>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

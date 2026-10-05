@@ -1,12 +1,13 @@
 // Hidden input, stdin reading, and a clipboard that clears itself.
 import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
+import { t } from "./i18n.js";
 
 // Typing without echo. The prompt goes to stderr so stdout stays clean for pipes (kv get … | …).
 export function readHidden(prompt) {
   return new Promise((resolve, reject) => {
     const { stdin, stderr } = process;
-    if (!stdin.isTTY) return reject(new Error("אין טרמינל להקלדת סיסמה. הרץ קודם: kv unlock --remember"));
+    if (!stdin.isTTY) return reject(new Error(t("tty.none")));
     stderr.write(prompt);
     stdin.setRawMode(true);
     stdin.resume();
@@ -22,7 +23,7 @@ export function readHidden(prompt) {
     const onData = (chunk) => {
       for (const ch of chunk) {
         if (ch === "\r" || ch === "\n") return done();
-        if (ch === "\u0003") return done(new Error("בוטל"));
+        if (ch === "\u0003") return done(new Error(t("cancelled")));
         if (ch === "\u0008" || ch === "\u007f") buf = buf.slice(0, -1);
         else if (ch >= " ") buf += ch;
       }

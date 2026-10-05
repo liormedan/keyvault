@@ -11,7 +11,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "כספת מפתחות",
+        "title": "Key vault",
         "width": 920,
         "height": 700,
         "minWidth": 420,

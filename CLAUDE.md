@@ -36,4 +36,4 @@ npm run app:build        # app/src-tauri/target/release/keyvault.exe
 npm run app:installer    # NSIS installer
 ```
 
-The UI and CLI messages are in Hebrew; code, comments and docs are in English.
+The interface is English by default with Hebrew as an option: backend/CLI strings in `src/i18n.js` (`t(key)`), window strings in `app/ui/i18n.js` (`tr(key)`, `L({en, he})` for type labels). Every user-facing string goes through one of them — add both languages. Code, comments and docs are in English.

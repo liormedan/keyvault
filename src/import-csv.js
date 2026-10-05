@@ -2,6 +2,7 @@
 // or a password manager (Bitwarden, LastPass, 1Password). Columns are matched by name, not position.
 // The export is plaintext — values are parsed in memory and never logged or echoed.
 import fs from "node:fs";
+import { t } from "./i18n.js";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -50,12 +51,12 @@ const hostOf = (url) => {
 // → { logins: [{ title, fields }], skipped } — rows without a password are skipped
 export function csvToLogins(text) {
   const rows = parseCsv(text);
-  if (rows.length < 2) throw new Error("הקובץ ריק או שאינו קובץ CSV של סיסמאות");
+  if (rows.length < 2) throw new Error(t("import.empty"));
   const header = rows[0].map((h) => h.trim().toLowerCase());
   const col = {};
   for (const [field, names] of Object.entries(ALIASES)) col[field] = header.findIndex((h) => names.includes(h));
   if (col.password < 0 || (col.url < 0 && col.title < 0)) {
-    throw new Error("לא נמצאו העמודות הצפויות (password, ו-url או name). זה קובץ ייצוא סיסמאות מדפדפן?");
+    throw new Error(t("import.columns"));
   }
   const logins = [];
   let skipped = 0;
@@ -65,7 +66,7 @@ export function csvToLogins(text) {
     if (!password) { skipped++; continue; }
     const url = get("url").trim();
     logins.push({
-      title: get("title").trim() || hostOf(url) || "(ללא שם)",
+      title: get("title").trim() || hostOf(url) || t("import.untitled"),
       fields: { url, username: get("username").trim(), password, totp: get("totp").trim(), notes: get("notes") },
     });
   }
@@ -77,9 +78,9 @@ export function readLoginsFile(file) {
   try {
     st = fs.statSync(file);
   } catch {
-    throw new Error("הקובץ לא נמצא");
+    throw new Error(t("import.notFound"));
   }
-  if (!st.isFile()) throw new Error("זה לא קובץ");
-  if (st.size > MAX_BYTES) throw new Error("הקובץ גדול מדי (מעל 20MB)");
+  if (!st.isFile()) throw new Error(t("import.notFile"));
+  if (st.size > MAX_BYTES) throw new Error(t("import.tooBig"));
   return csvToLogins(fs.readFileSync(file, "utf8"));
 }

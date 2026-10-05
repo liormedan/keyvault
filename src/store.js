@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { deriveKey, newKdfParams, open, seal } from "./crypto.js";
+import { t } from "./i18n.js";
 import { TYPES, subtitle } from "./types.js";
 
 export const HOME = process.env.KV_HOME || path.join(os.homedir(), ".keyvault");
@@ -13,7 +14,7 @@ export const VAULT = path.join(HOME, "vault.kv");
 export const exists = () => fs.existsSync(VAULT);
 
 export function readFile() {
-  if (!exists()) throw new Error(`אין כספת ב-${VAULT}. הרץ: kv init`);
+  if (!exists()) throw new Error(t("vault.none", { path: VAULT }));
   return JSON.parse(fs.readFileSync(VAULT, "utf8"));
 }
 
@@ -28,7 +29,7 @@ function writeFile(obj) {
 const headerOf = (file) => ({ v: file.v, kdf: file.kdf });
 
 export async function create(password) {
-  if (exists()) throw new Error(`כבר קיימת כספת ב-${VAULT}`);
+  if (exists()) throw new Error(t("vault.exists", { path: VAULT }));
   const header = { v: 1, kdf: await newKdfParams() };
   const key = await deriveKey(password, header.kdf);
   const data = { created: new Date().toISOString(), projects: {}, items: {} };
@@ -65,13 +66,13 @@ function normalize(data) {
 // "project/KEY" → ["project", "KEY"]
 export function parseRef(ref) {
   const i = String(ref || "").indexOf("/");
-  if (i <= 0 || i === ref.length - 1) throw new Error(`שם לא תקין: "${ref}". הצורה: פרויקט/מפתח, למשל my-app/API_KEY`);
+  if (i <= 0 || i === ref.length - 1) throw new Error(t("ref.invalid", { ref }));
   return [ref.slice(0, i), ref.slice(i + 1)];
 }
 
 export function getEntry(data, project, name) {
   const e = data.projects[project]?.[name];
-  if (!e) throw new Error(`לא נמצא: ${project}/${name}`);
+  if (!e) throw new Error(t("entry.notFound", { ref: `${project}/${name}` }));
   return e;
 }
 
@@ -112,7 +113,7 @@ export function listItems(data) {
 
 export function getItem(data, id) {
   const it = data.items[String(id)];
-  if (!it) throw new Error("הפריט לא נמצא");
+  if (!it) throw new Error(t("item.notFound"));
   return it;
 }
 
@@ -131,7 +132,7 @@ export function maskedItem(data, id) {
 export function itemValue(data, id, k) {
   const it = getItem(data, id);
   const v = it.fields[String(k)];
-  if (v == null || v === "") throw new Error("השדה ריק");
+  if (v == null || v === "") throw new Error(t("item.fieldEmpty"));
   return v;
 }
 
@@ -139,15 +140,15 @@ export function saveItem(data, { id, type, title, fields }) {
   const prev = id ? getItem(data, id) : null;
   type = prev ? prev.type : String(type || "");
   const def = TYPES[type];
-  if (!def) throw new Error(`סוג לא מוכר: ${type}`);
+  if (!def) throw new Error(t("item.unknownType", { type }));
   title = String(title || "").trim();
-  if (!title) throw new Error("חסרה כותרת");
+  if (!title) throw new Error(t("item.noTitle"));
   const clean = {};
   for (const f of def.fields) {
     const v = fields?.[f.k];
     if (v == null) continue;
     const str = String(v);
-    if (str.length > MAX_FIELD) throw new Error(`${f.label}: ארוך מדי`);
+    if (str.length > MAX_FIELD) throw new Error(t("item.tooLong", { field: f.label.en }));
     if (str.trim() !== "") clean[f.k] = f.kind === "multiline" ? str : str.trim();
   }
   const now = new Date().toISOString();

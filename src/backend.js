@@ -6,6 +6,7 @@ import path from "node:path";
 import readline from "node:readline";
 import { randomPassword, wipe } from "./crypto.js";
 import * as dpapi from "./dpapi.js";
+import { getLang, setLang, t } from "./i18n.js";
 import { readLoginsFile } from "./import-csv.js";
 import { copyWithClear } from "./io.js";
 import * as store from "./store.js";
@@ -35,6 +36,9 @@ function need() {
 const str = (v) => String(v ?? "").trim();
 
 const methods = {
+  // The window decides the language and tells the backend, so errors come back in the same language
+  setLang: ({ lang }) => (setLang(String(lang)), { lang: getLang() }),
+
   status: () => ({
     exists: store.exists(),
     unlocked: !!session,
@@ -44,7 +48,7 @@ const methods = {
   }),
 
   async init({ password }) {
-    if (!password) throw new Error("סיסמת אב ריקה");
+    if (!password) throw new Error(t("pw.empty"));
     session = await store.create(String(password));
     return { ok: true };
   },
@@ -56,12 +60,12 @@ const methods = {
       return { ok: true };
     }
     const cached = dpapi.recall(store.salt());
-    if (!cached) throw new Error("נדרשת סיסמת אב");
+    if (!cached) throw new Error(t("pw.required"));
     try {
       session = await store.unlockWithKey(cached);
     } catch {
       dpapi.forget();
-      throw new Error("הזכירה לא תקפה יותר — נדרשת סיסמת אב");
+      throw new Error(t("remember.stale"));
     }
     return { ok: true };
   },
@@ -82,7 +86,7 @@ const methods = {
     const { key, data } = need();
     p = str(p);
     k = str(k);
-    if (!p || !k || p.includes("/") || !value) throw new Error("חסר פרויקט, שם או ערך (בלי / בשם הפרויקט)");
+    if (!p || !k || p.includes("/") || !value) throw new Error(t("entry.missing"));
     store.setEntry(data, p, k, String(value), note == null ? undefined : String(note));
     await store.save(key, data);
     return { ok: true };
@@ -142,7 +146,7 @@ const methods = {
   },
 
   importCleanup() {
-    if (!lastImport) throw new Error("אין קובץ למחיקה");
+    if (!lastImport) throw new Error(t("import.noFile"));
     fs.rmSync(lastImport, { force: true });
     lastImport = null;
     return { ok: true };
@@ -163,7 +167,7 @@ rl.on("line", (line) => {
       const req = JSON.parse(line);
       id = req.id ?? null;
       const fn = methods[req.method];
-      if (!fn) throw new Error(`פעולה לא מוכרת: ${req.method}`);
+      if (!fn) throw new Error(t("op.unknown", { name: req.method }));
       const result = await fn(req.params || {});
       if (session) bump();
       reply({ id, result });

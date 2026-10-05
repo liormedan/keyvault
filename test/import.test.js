@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 // Temporary vault — never the real one. All CSV data here is made up.
@@ -49,8 +49,8 @@ test("firefox export: no name column — title falls back to the host", () => {
 });
 
 test("a file that is not a password export is rejected", () => {
-  assert.throws(() => csvToLogins("a,b\n1,2\n"), /העמודות הצפויות/);
-  assert.throws(() => csvToLogins("only one line"), /ריק/);
+  assert.throws(() => csvToLogins("a,b\n1,2\n"), /Expected columns/);
+  assert.throws(() => csvToLogins("only one line"), /empty/);
 });
 
 test("import into the vault: de-duplicates across files and re-imports", async () => {
@@ -75,6 +75,7 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
     env: { ...process.env, KV_HOME: HOME },
     stdio: ["pipe", "pipe", "pipe"],
   });
+  after(() => child.kill());
   let stderr = "";
   child.stderr.on("data", (c) => (stderr += c));
   const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();
@@ -84,16 +85,16 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
     return JSON.parse((await lines.next()).value);
   };
   assert.equal((await call("importCsv", { path: csv })).error, "locked");
-  assert.match((await call("importCleanup")).error, /אין קובץ/);
+  assert.match((await call("importCleanup")).error, /No file to delete/);
   await call("unlock", { password: PW });
-  assert.match((await call("importCsv", { path: path.join(HOME, "missing.csv") })).error, /לא נמצא/);
+  assert.match((await call("importCsv", { path: path.join(HOME, "missing.csv") })).error, /File not found/);
   const res = await call("importCsv", { path: csv });
   assert.deepEqual(res.result, { added: 1, duplicates: 2, skipped: 0, file: "Chrome Passwords.csv" });
   assert.ok(!JSON.stringify(res).includes("pw-new"), "the reply carries no values");
   assert.equal((await call("importCleanup")).result.ok, true);
   assert.ok(!fs.existsSync(csv), "the imported CSV is deleted");
   assert.ok(fs.existsSync(other), "nothing else is touched");
-  assert.match((await call("importCleanup")).error, /אין קובץ/);
+  assert.match((await call("importCleanup")).error, /No file to delete/);
   assert.equal((await call("items")).result.items.length, 4);
   child.stdin.end();
   assert.ok(!stderr.includes("pw-"), "no values on stderr");

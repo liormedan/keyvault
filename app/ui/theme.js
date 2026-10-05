@@ -8,11 +8,12 @@
   function apply(theme) {
     if (theme === "light") root.dataset.theme = "light";
     else delete root.dataset.theme;
-    for (const b of document.querySelectorAll(".theme-toggle")) b.textContent = theme === "light" ? "מצב כהה" : "מצב בהיר";
+    for (const b of document.querySelectorAll(".theme-toggle")) b.textContent = window.I18N ? window.I18N.tr(theme === "light" ? "theme.dark" : "theme.light") : "";
     window.__TAURI__?.window.getCurrentWindow().setTheme(theme).catch(() => {}); // Windows title bar
   }
 
   apply(read());
+  document.addEventListener("kv-lang", () => apply(read()));
   document.addEventListener("DOMContentLoaded", () => {
     apply(read());
     for (const b of document.querySelectorAll(".theme-toggle")) {

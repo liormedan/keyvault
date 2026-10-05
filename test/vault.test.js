@@ -13,14 +13,14 @@ test("create, save and reopen with the right password", async () => {
   store.setEntry(data, "demo", "SMTP_PASS", "s3cret-value", "Gmail");
   await store.save(key, data);
   const raw = fs.readFileSync(store.VAULT, "utf8");
-  assert.ok(!raw.includes("s3cret-value"), "הערך לא מופיע בקובץ בטקסט גלוי");
-  assert.ok(!raw.includes("SMTP_PASS"), "גם שם המפתח מוצפן");
+  assert.ok(!raw.includes("s3cret-value"), "the value is not in the file in plain text");
+  assert.ok(!raw.includes("SMTP_PASS"), "the key name is encrypted too");
   const opened = await store.unlockWithPassword("correct horse battery");
   assert.equal(store.getEntry(opened.data, "demo", "SMTP_PASS").value, "s3cret-value");
 });
 
 test("wrong password fails", async () => {
-  await assert.rejects(store.unlockWithPassword("wrong password!!"), /סיסמת אב שגויה/);
+  await assert.rejects(store.unlockWithPassword("wrong password!!"), /Wrong master password/);
 });
 
 test("tampering with the file (header included) fails decryption", async () => {

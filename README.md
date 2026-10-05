@@ -5,7 +5,7 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 
 ![keyvault desktop app](docs/screenshot.png)
 
-> The interface (app and CLI messages) is in Hebrew, right-to-left. The code, docs and file format are language-neutral.
+> The interface is in English by default, with Hebrew (right-to-left) one click away — the language button in the app, or `kv lang he` for the command line.
 
 ## Features
 
@@ -48,9 +48,10 @@ kv backup [dir]                           # dated encrypted copy (default: KV_BA
 kv passwd                                 # change the master password
 kv forget                                 # drop "remember me"
 kv ui                                     # browser UI on 127.0.0.1 (if you don't use the desktop app)
+kv lang <en|he>                           # interface language (also: KV_LANG)
 ```
 
-Environment: `KV_HOME` — vault folder (default `~/.keyvault`). `KV_BACKUP_DIR` — default backup folder. `KV_NO_OPEN=1` — `kv ui` doesn't open a browser.
+Environment: `KV_LANG` — `en` or `he` (overrides `kv lang`). `KV_HOME` — vault folder (default `~/.keyvault`). `KV_BACKUP_DIR` — default backup folder. `KV_NO_OPEN=1` — `kv ui` doesn't open a browser.
 
 ## Security model
 
@@ -83,6 +84,7 @@ Layout:
 | `src/import-csv.js` | password CSV import — columns matched by name |
 | `src/backend.js` | desktop backend: JSON lines over stdin/stdout |
 | `src/cli.js` | the `kv` command |
+| `src/i18n.js`, `app/ui/i18n.js` | English and Hebrew strings — backend/CLI and the window |
 | `src/dpapi.js` | "remember me" via Windows DPAPI |
 | `app/ui/` | the window (plain HTML/JS/CSS, strict CSP, no build step) |
 | `app/src-tauri/` | the Tauri shell — starts the backend and relays requests; no crypto |

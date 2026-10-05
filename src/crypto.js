@@ -1,6 +1,7 @@
 // Encryption — libsodium primitives only, no home-made crypto.
 // Key derivation: Argon2id (crypto_pwhash). Encryption: XChaCha20-Poly1305 (AEAD) — any change to the file fails decryption.
 import _sodium from "libsodium-wrappers-sumo";
+import { t } from "./i18n.js";
 
 let sodium;
 export async function ready() {
@@ -24,7 +25,7 @@ export async function newKdfParams() {
 
 export async function deriveKey(password, kdf) {
   const s = await ready();
-  if (kdf.alg !== "argon2id13") throw new Error(`אלגוריתם לא מוכר: ${kdf.alg}`);
+  if (kdf.alg !== "argon2id13") throw new Error(t("kdf.unknown", { alg: kdf.alg }));
   return s.crypto_pwhash(
     s.crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
     password,
@@ -59,7 +60,7 @@ export async function open(key, file) {
       key,
     );
   } catch {
-    throw new Error("סיסמת אב שגויה, או שהקובץ שונה");
+    throw new Error(t("pw.wrong"));
   }
   return JSON.parse(s.to_string(pt));
 }

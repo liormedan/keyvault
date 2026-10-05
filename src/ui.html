@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="{{lang}}" dir="{{dir}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>כספת מפתחות</title>
+<title>{{web.title}}</title>
 <style>
   :root { --bg:#f6f4ef; --card:#fff; --ink:#1d2433; --muted:#6b7280; --line:#e5e1d8; --accent:#2f5d50; --danger:#a33a2c; }
   @media (prefers-color-scheme: dark) { :root { --bg:#14171d; --card:#1d222b; --ink:#e8e6e1; --muted:#9aa1ad; --line:#2c323d; --accent:#7fb8a4; --danger:#e08a7c; } }
@@ -38,10 +38,10 @@
 </head>
 <body>
 <header>
-  <h1>כספת מפתחות</h1>
-  <input type="search" id="q" placeholder="חיפוש פרויקט או מפתח" aria-label="חיפוש">
-  <button class="primary" id="add">הוספת מפתח</button>
-  <button id="lock">נעילה</button>
+  <h1>{{web.title}}</h1>
+  <input type="search" id="q" placeholder="{{web.search}}" aria-label="{{web.searchLabel}}">
+  <button class="primary" id="add">{{web.add}}</button>
+  <button id="lock">{{web.lock}}</button>
 </header>
 <main>
   <div id="list"></div>
@@ -50,19 +50,20 @@
 
 <dialog id="dlg">
   <form method="dialog" id="form">
-    <h2 id="dlgTitle" style="margin:0;font-size:16px">הוספת מפתח</h2>
-    <label>פרויקט <input name="p" required placeholder="my-app" dir="ltr"></label>
-    <label>שם המפתח <input name="k" required placeholder="SMTP_PASS" dir="ltr"></label>
-    <label>ערך <input name="value" type="password" required autocomplete="off" dir="ltr"></label>
-    <label>הערה (לא חובה) <input name="note" placeholder="למה זה משמש"></label>
-    <div class="actions"><button value="cancel" formnovalidate>ביטול</button><button class="primary" value="ok">שמירה</button></div>
+    <h2 id="dlgTitle" style="margin:0;font-size:16px">{{web.add}}</h2>
+    <label>{{web.project}} <input name="p" required placeholder="my-app" dir="ltr"></label>
+    <label>{{web.keyName}} <input name="k" required placeholder="SMTP_PASS" dir="ltr"></label>
+    <label>{{web.value}} <input name="value" type="password" required autocomplete="off" dir="ltr"></label>
+    <label>{{web.note}} <input name="note" placeholder="{{web.notePlaceholder}}"></label>
+    <div class="actions"><button value="cancel" formnovalidate>{{web.cancel}}</button><button class="primary" value="ok">{{web.save}}</button></div>
   </form>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+const T = {{T}};
 const TOKEN = location.hash.slice(1);
-history.replaceState(null, "", "/"); // הטוקן לא נשאר בשורת הכתובת
+history.replaceState(null, "", "/"); // the token does not stay in the address bar
 const api = async (path, body) => {
   const r = await fetch(path, { method: body ? "POST" : "GET", headers: { "X-KV-Token": TOKEN, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
@@ -78,7 +79,7 @@ async function load() {
   try {
     const j = await api("/api/list");
     projects = j.projects; $("#path").textContent = j.vault; render();
-  } catch (e) { $("#list").replaceChildren(el("p", { className: "empty", textContent: "החלון נסגר או שהקישור לא תקף. הרץ שוב: kv ui" })); }
+  } catch (e) { $("#list").replaceChildren(el("p", { className: "empty", textContent: T["web.gone"] })); }
 }
 
 function render() {
@@ -89,27 +90,27 @@ function render() {
     if (!rows.length) continue;
     out.push(el("section", {}, el("h2", { textContent: p }), ...rows.map((e) => row(p, e))));
   }
-  $("#list").replaceChildren(...(out.length ? out : [el("p", { className: "empty", textContent: q ? "אין תוצאות" : "הכספת ריקה — הוסף מפתח ראשון" })]));
+  $("#list").replaceChildren(...(out.length ? out : [el("p", { className: "empty", textContent: q ? T["web.noResults"] : T["web.empty"] })]));
 }
 
 function row(p, e) {
   const shown = el("span");
-  const reveal = el("button", { textContent: "הצג", onclick: async () => {
-    if (shown.textContent) { shown.replaceChildren(); reveal.textContent = "הצג"; return; }
+  const reveal = el("button", { textContent: T["web.show"], onclick: async () => {
+    if (shown.textContent) { shown.replaceChildren(); reveal.textContent = T["web.show"]; return; }
     const { value } = await api(`/api/value?p=${encodeURIComponent(p)}&k=${encodeURIComponent(e.key)}`);
-    shown.replaceChildren(el("span", { className: "val", textContent: value })); reveal.textContent = "הסתר";
-    setTimeout(() => { shown.replaceChildren(); reveal.textContent = "הצג"; }, 15000);
+    shown.replaceChildren(el("span", { className: "val", textContent: value })); reveal.textContent = T["web.hide"];
+    setTimeout(() => { shown.replaceChildren(); reveal.textContent = T["web.show"]; }, 15000);
   }});
-  const copy = el("button", { textContent: "העתק", onclick: async () => {
+  const copy = el("button", { textContent: T["web.copy"], onclick: async () => {
     const { value } = await api(`/api/value?p=${encodeURIComponent(p)}&k=${encodeURIComponent(e.key)}`);
     await navigator.clipboard.writeText(value);
-    toast("הועתק — הלוח יתנקה בעוד 20 שניות");
+    toast(T["web.copied"]);
     setTimeout(async () => { try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(""); } catch {} }, 20000);
   }});
-  const edit = el("button", { textContent: "עריכה", onclick: () => openDlg(p, e) });
-  const del = el("button", { className: "danger", textContent: "מחיקה", onclick: async () => {
-    if (!confirm(`למחוק את ${p}/${e.key}?`)) return;
-    await api("/api/delete", { p, k: e.key }); toast("נמחק"); load();
+  const edit = el("button", { textContent: T["web.editBtn"], onclick: () => openDlg(p, e) });
+  const del = el("button", { className: "danger", textContent: T["web.delete"], onclick: async () => {
+    if (!confirm(T["web.confirmDelete"].replace("{ref}", `${p}/${e.key}`))) return;
+    await api("/api/delete", { p, k: e.key }); toast(T["web.deleted"]); load();
   }});
   return el("div", { className: "row" },
     el("div", {}, el("div", { className: "name", textContent: e.key }), el("div", { className: "note", textContent: e.note || "" })),
@@ -120,22 +121,22 @@ function row(p, e) {
 function openDlg(p, e) {
   const f = $("#form");
   f.reset();
-  $("#dlgTitle").textContent = e ? "עריכת מפתח" : "הוספת מפתח";
+  $("#dlgTitle").textContent = e ? T["web.edit"] : T["web.add"];
   f.p.value = p || ""; f.k.value = e?.key || ""; f.note.value = e?.note || "";
   f.p.readOnly = f.k.readOnly = !!e;
-  f.value.placeholder = e ? "ערך חדש" : "";
+  f.value.placeholder = e ? T["web.newValue"] : "";
   $("#dlg").showModal();
 }
 
 $("#dlg").addEventListener("close", async () => {
   if ($("#dlg").returnValue !== "ok") return;
   const f = $("#form");
-  try { await api("/api/set", { p: f.p.value, k: f.k.value, value: f.value.value, note: f.note.value }); f.value.value = ""; toast("נשמר"); load(); }
+  try { await api("/api/set", { p: f.p.value, k: f.k.value, value: f.value.value, note: f.note.value }); f.value.value = ""; toast(T["web.saved"]); load(); }
   catch (e) { toast(e.message); }
 });
 $("#add").onclick = () => openDlg();
 $("#q").oninput = render;
-$("#lock").onclick = async () => { await api("/api/lock", {}).catch(() => {}); document.body.replaceChildren(el("p", { className: "empty", textContent: "הכספת ננעלה. אפשר לסגור את החלון." })); };
+$("#lock").onclick = async () => { await api("/api/lock", {}).catch(() => {}); document.body.replaceChildren(el("p", { className: "empty", textContent: T["web.lockedNow"] })); };
 load();
 </script>
 </body>

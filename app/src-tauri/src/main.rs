@@ -44,7 +44,7 @@ fn backend_script(app: &AppHandle) -> PathBuf {
 fn spawn(app: &AppHandle) -> Result<Backend, String> {
     let script = backend_script(app);
     if !script.exists() {
-        return Err(format!("לא נמצא {}", script.display()));
+        return Err(format!("backend not found: {}", script.display()));
     }
     let mut cmd = Command::new("node");
     cmd.arg(&script)
@@ -58,9 +58,9 @@ fn spawn(app: &AppHandle) -> Result<Backend, String> {
     }
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("לא הצלחתי להפעיל node: {e}"))?;
-    let stdin = child.stdin.take().ok_or("אין stdin")?;
-    let stdout = BufReader::new(child.stdout.take().ok_or("אין stdout")?);
+        .map_err(|e| format!("could not start node (is Node.js 20+ installed?): {e}"))?;
+    let stdin = child.stdin.take().ok_or("no stdin")?;
+    let stdout = BufReader::new(child.stdout.take().ok_or("no stdout")?);
     Ok(Backend { child, stdin, stdout, next: 0 })
 }
 
@@ -76,9 +76,9 @@ fn call(backend: &mut Backend, method: &str, params: Value) -> Result<Value, Str
         Ok(0) | Err(_) => return Err("backend-gone".into()),
         Ok(_) => {}
     }
-    let resp: Value = serde_json::from_str(&out).map_err(|_| "תשובה לא תקינה מהשרת".to_string())?;
+    let resp: Value = serde_json::from_str(&out).map_err(|_| "invalid reply from the backend".to_string())?;
     if resp.get("id").and_then(Value::as_u64) != Some(id) {
-        return Err("תשובה לא תואמת".into());
+        return Err("mismatched reply from the backend".into());
     }
     if let Some(e) = resp.get("error").and_then(Value::as_str) {
         return Err(e.to_string());
@@ -107,5 +107,5 @@ fn main() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![kv])
         .run(tauri::generate_context!())
-        .expect("keyvault: הפעלת החלון נכשלה");
+        .expect("keyvault: failed to start the window");
 }
