@@ -86,7 +86,7 @@ Layout:
 | `src/import-csv.ts` | password CSV import — columns matched by name |
 | `src/backend.ts` | desktop backend: JSON lines over stdin/stdout |
 | `src/cli.ts` | the `kv` command |
-| `src/i18n.ts`, `app/ui/i18n.js` | English and Hebrew strings — backend/CLI and the window |
+| `src/i18n.ts`, `app/ui/i18n.ts` | English and Hebrew strings — backend/CLI and the window |
 | `src/dpapi.ts` | "remember me" via Windows DPAPI |
 | `app/ui/` | the window (plain HTML/JS/CSS, strict CSP, no build step) |
 | `app/src-tauri/` | the Tauri shell — starts the backend and relays requests; no crypto |
