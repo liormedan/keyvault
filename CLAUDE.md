@@ -16,6 +16,8 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 |---|---|
 | `src/crypto.js` | Argon2id key derivation, XChaCha20-Poly1305 with the header as additional data, password generator |
 | `src/store.js` | vault file (`~/.keyvault/vault.kv`): atomic write + `.bak`, dev keys (`projects`) and typed items (`items`) |
+| `src/model.ts` | the data model (vault file, items, listings) — types only |
+| `src/protocol.ts` | the window ↔ backend contract: every method's params and result. Change it first, then both sides; `test/protocol.typecheck.ts` proves bad calls fail to compile |
 | `src/types.js` | item types — fields, `secret`, `generate`, `primary`. Single source for the backend and the window |
 | `src/import-csv.js` | login import from a browser / password-manager CSV export. Never read a browser's password store directly — only the user's own export file |
 | `src/backend.js` | desktop backend: one JSON line per request/reply on stdin/stdout, auto-lock after 15 minutes. Finishes queued requests before exiting on stdin close |
