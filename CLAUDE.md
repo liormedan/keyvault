@@ -20,11 +20,11 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/protocol.ts` | the window ↔ backend contract: every method's params and result. Change it first, then both sides; `test/protocol.typecheck.ts` proves bad calls fail to compile |
 | `src/types.ts` | item types — fields, `secret`, `generate`, `primary`. Single source for the backend and the window |
 | `src/import-csv.ts` | login import from a browser / password-manager CSV export. Never read a browser's password store directly — only the user's own export file |
-| `src/backend.js` | desktop backend: one JSON line per request/reply on stdin/stdout, auto-lock after 15 minutes. Finishes queued requests before exiting on stdin close |
+| `src/backend.ts` | desktop backend: one JSON line per request/reply on stdin/stdout, auto-lock after 15 minutes. `methods ... satisfies Handlers` — checked against `src/protocol.ts`. Finishes queued requests before exiting on stdin close |
 | `src/dpapi.ts` | "remember me": the derived key encrypted with Windows DPAPI via PowerShell (stdin, not argv) |
 | `src/io.ts` | hidden input, stdin, clipboard cleared after 20 s (hash comparison) |
-| `src/cli.js` | the `kv` command (`npm link`) |
-| `src/ui-server.js` + `src/ui.html` | browser UI for `kv ui`: 127.0.0.1, random port and token, Host/Origin checks |
+| `src/cli.ts` | the `kv` command (`npm link`) |
+| `src/ui-server.ts` + `src/ui.html` | browser UI for `kv ui`: 127.0.0.1, random port and token, Host/Origin checks |
 | `app/src-tauri/` | Tauri 2 shell: spawns `node backend.mjs` (bundled resource, `KV_BACKEND` override, source fallback in dev) and relays the `kv` command. No crypto |
 | `app/ui/` | the window — HTML/CSS + scripts bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`), CSP without inline script |
 | `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
