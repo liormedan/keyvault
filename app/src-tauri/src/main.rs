@@ -42,6 +42,14 @@ fn backend_script(app: &AppHandle) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/backend.mjs")
 }
 
+// KV_BACKEND_LOG: the window test collects the backend's stderr (startup errors only — it never writes values)
+fn backend_stderr() -> Stdio {
+    std::env::var("KV_BACKEND_LOG")
+        .ok()
+        .and_then(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).ok())
+        .map_or_else(Stdio::null, Stdio::from)
+}
+
 fn spawn(app: &AppHandle) -> Result<Backend, String> {
     let script = backend_script(app);
     if !script.exists() {
@@ -51,7 +59,7 @@ fn spawn(app: &AppHandle) -> Result<Backend, String> {
     cmd.arg(&script)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(backend_stderr());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

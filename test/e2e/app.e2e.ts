@@ -26,6 +26,8 @@ fs.mkdirSync(OUT, { recursive: true });
 const PW = "app e2e test password";
 const SECRET = "e2e-secret-value-42";
 const PORT = 9333;
+const BACKEND_LOG = path.join(HOME, "backend.log");
+const backendLog = () => (fs.existsSync(BACKEND_LOG) ? fs.readFileSync(BACKEND_LOG, "utf8").slice(-1500) : "(none)");
 const log = (...a: unknown[]) => console.log("•", ...a);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,6 +45,7 @@ async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> 
       KV_HOME: HOME,
       WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
+      KV_BACKEND_LOG: BACKEND_LOG,
       ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -102,7 +105,7 @@ await page.waitForSelector("#setup:not([hidden])").catch(async (e: Error) => {
     .catch((err: Error) => `evaluate failed: ${err.message}`);
   const body = ((await page.textContent("body").catch(() => "")) ?? "").replace(/\s+/g, " ").slice(0, 300);
   throw new Error(
-    `setup screen never showed (${e.message.split(String.fromCharCode(10))[0]}). status: ${JSON.stringify(status)} · console: ${a.errors.join(" | ") || "(none)"} · body: ${body}`,
+    `setup screen never showed (${e.message.split(String.fromCharCode(10))[0]}). status: ${JSON.stringify(status)} · console: ${a.errors.join(" | ") || "(none)"} · body: ${body} · backend stderr: ${backendLog()}`,
   );
 });
 log("setup screen shown");
