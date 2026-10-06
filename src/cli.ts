@@ -9,6 +9,7 @@ import { getLang } from "./i18n.ts";
 import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { readLoginsFile } from "./import-csv.ts";
+import { diff as diffValues, type Diff, githubSecretNames, type Platform, PLATFORMS, pullVercel, push, vercelTarget } from "./platforms.ts";
 import { findProject, suggestName, writeProject } from "./project.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
 import * as store from "./store.ts";
@@ -42,6 +43,13 @@ function resolveProject(): { project: string; env?: string } {
   if (!found) throw new UsageError(t("project.none"));
   const e = env ?? found.env;
   return { project: found.project, ...(e ? { env: e } : {}) };
+}
+
+/** resolveProject, plus the folder of .kv.json — platform CLIs run there (it is where `vercel link` lives) */
+function resolveProjectWithDir(): { project: string; env?: string; dir?: string } {
+  const r = resolveProject();
+  const found = findProject();
+  return found && found.project === r.project ? { ...r, dir: found.dir } : r;
 }
 
 /** Wrong arguments: exit code 2 (other failures exit 1) */
@@ -308,6 +316,72 @@ const commands: Record<string, () => Promise<void>> = {
     else store.renameProject(data, from, to);
     await store.save(key, data);
     err(t("cli.moved", { from, to }));
+  },
+
+  async push() {
+    const platform = args.shift() as Platform | undefined;
+    if (!platform || !PLATFORMS.includes(platform)) throw new UsageError(t("cli.usage.push"));
+    const dry = has("--dry-run");
+    const sensitive = has("--sensitive");
+    const explicitTarget = flag("--target");
+    const repo = flag("--repo");
+    const environment = flag("--environment");
+    const { project, env, dir } = resolveProjectWithDir();
+    const target = vercelTarget(env, explicitTarget);
+    const { data } = await unlock();
+    const values = store.projectValues(data, project, env);
+    const where = platform === "vercel" ? ` (${target})` : repo || environment ? ` (${[repo, environment].filter(Boolean).join(", ")})` : "";
+    const names = Object.keys(values).sort();
+    if (dry) {
+      err(t("push.dryRun", { n: names.length, project, platform, where, names: names.join(", ") }));
+      return;
+    }
+    push(platform, values, { target, sensitive, ...(repo ? { repo } : {}), ...(environment ? { environment } : {}), ...(dir ? { cwd: dir } : {}) });
+    err(t("push.done", { n: names.length, project, platform, where, names: names.join(", ") }));
+  },
+
+  async pull() {
+    const platform = args.shift();
+    if (platform === "github") throw new UsageError(t("pull.githubNo"));
+    if (platform !== "vercel") throw new UsageError(t("cli.usage.pull"));
+    const explicitTarget = flag("--target");
+    const { project, env, dir } = resolveProjectWithDir();
+    const target = vercelTarget(env, explicitTarget);
+    const { key, data } = await unlock();
+    const theirs = pullVercel(target, dir, parseEnv);
+    for (const [k, v] of Object.entries(theirs)) store.setEntry(data, project, k, v, undefined, env);
+    await store.save(key, data);
+    const names = Object.keys(theirs).sort();
+    err(t("pull.done", { n: names.length, target, project, env: env ? ` (${env})` : "", names: names.join(", ") }));
+  },
+
+  async diff() {
+    const platform = args.shift() as Platform | undefined;
+    if (!platform || !PLATFORMS.includes(platform)) throw new UsageError(t("cli.usage.diff"));
+    const explicitTarget = flag("--target");
+    const repo = flag("--repo");
+    const environment = flag("--environment");
+    const asJson = json();
+    const { project, env, dir } = resolveProjectWithDir();
+    const target = vercelTarget(env, explicitTarget);
+    const { data } = await unlock();
+    const mine = store.projectValues(data, project, env);
+    let d: Diff;
+    if (platform === "vercel") {
+      const theirs = pullVercel(target, dir, parseEnv);
+      d = diffValues(mine, Object.keys(theirs), theirs);
+    } else {
+      d = diffValues(mine, githubSecretNames({ ...(repo ? { repo } : {}), ...(environment ? { environment } : {}), ...(dir ? { cwd: dir } : {}) }));
+    }
+    // differences → exit 1, in either output mode (scripts can gate on it)
+    if (d.onlyVault.length || d.onlyPlatform.length || d.changed.length) process.exitCode = 1;
+    if (asJson) return console.log(JSON.stringify(d, null, 2));
+    const where = platform === "vercel" ? ` (${target})` : repo || environment ? ` (${[repo, environment].filter(Boolean).join(", ")})` : "";
+    console.log(t("diff.title", { project, env: env ? ` [${env}]` : "", platform, where }));
+    for (const k of d.onlyVault) console.log(`  + ${k}  ${t("diff.onlyVault")}`);
+    for (const k of d.onlyPlatform) console.log(`  - ${k}  ${t("diff.onlyPlatform", { platform })}`);
+    for (const k of d.changed) console.log(`  ~ ${k}  ${t("diff.changed")}`);
+    console.log(`  = ${t("diff.same", { n: d.same })}${platform === "github" ? ` ${t("diff.namesOnly")}` : ""}`);
   },
 
   async status() {

@@ -24,6 +24,24 @@ const EN = {
     "ref.invalid": "Invalid name: \"{ref}\". Use project/KEY, e.g. my-app/API_KEY",
     "entry.notFound": "Not found: {ref}",
     "entry.missing": "Missing project, name or value (no / in the project name)",
+    "push.unsafeArg": "Refusing to pass {arg} to a platform CLI (only names, targets and repo names are allowed)",
+    "push.noTool": "{tool} is not installed or not on PATH",
+    "push.badTarget": "Unknown Vercel target {target}: use production, preview or development",
+    "push.badName": "{name} is not a valid environment variable name for a platform",
+    "push.failed": "{tool} failed {name}: {reason}",
+    "push.done": "Pushed {n} keys from {project} to {platform}{where}: {names}",
+    "push.dryRun": "Would push {n} keys from {project} to {platform}{where}: {names}",
+    "pull.done": "Pulled {n} keys from Vercel ({target}) into {project}{env}: {names}",
+    "pull.githubNo": "GitHub secrets can't be read back — pull works with Vercel only",
+    "diff.title": "{project}{env} ↔ {platform}{where}",
+    "diff.onlyVault": "only in the vault",
+    "diff.onlyPlatform": "only on {platform}",
+    "diff.changed": "different value",
+    "diff.same": "{n} the same",
+    "diff.namesOnly": "(GitHub can't show values — names only)",
+    "cli.usage.push": "Usage: kv push <vercel|github> [project] [--env e] [--target production|preview|development] [--sensitive] [--repo owner/name] [--environment name] [--dry-run]",
+    "cli.usage.pull": "Usage: kv pull vercel [project] [--env e] [--target production|preview|development]",
+    "cli.usage.diff": "Usage: kv diff <vercel|github> [project] [--env e] [--target …] [--repo owner/name] [--environment name]",
     "entry.noValue": "{ref} has no value for {env}",
     "entry.exists": "{ref} already exists",
     "project.exists": "Project {name} already exists",
@@ -70,6 +88,9 @@ const EN = {
   kv example [project]             .env.example from the vault (names only)
   kv check [project] [--file f] [--env e]   which keys in .env.example are missing
   kv mv <from> <to>                rename a key (project/KEY) or a project
+  kv push <vercel|github> [project] [--env e]   send the project's keys (values via stdin)
+  kv pull vercel [project] [--env e]            bring Vercel's values into the vault
+  kv diff <vercel|github> [project] [--env e]   what differs (names only, never values)
   kv import <project> <file.env>   import an env file
   kv import-passwords <file.csv> [--delete]   import logins from a browser export (Chrome / Edge / Firefox)
   kv ui                            browser window to view, search and edit (local only)
@@ -176,6 +197,24 @@ const HE: Record<MessageKey, string> = {
     "ref.invalid": "שם לא תקין: \"{ref}\". הצורה: פרויקט/מפתח, למשל my-app/API_KEY",
     "entry.notFound": "לא נמצא: {ref}",
     "entry.missing": "חסר פרויקט, שם או ערך (בלי / בשם הפרויקט)",
+    "push.unsafeArg": "לא מעביר את {arg} לכלי של הפלטפורמה (מותרים רק שמות, יעדים ושמות מאגר)",
+    "push.noTool": "{tool} לא מותקן או לא נמצא ב-PATH",
+    "push.badTarget": "יעד Vercel לא מוכר: {target}. אפשר production, preview או development",
+    "push.badName": "{name} אינו שם תקין למשתנה סביבה בפלטפורמה",
+    "push.failed": "{tool} נכשל {name}: {reason}",
+    "push.done": "נדחפו {n} מפתחות מ-{project} ל-{platform}{where}: {names}",
+    "push.dryRun": "יידחפו {n} מפתחות מ-{project} ל-{platform}{where}: {names}",
+    "pull.done": "נמשכו {n} מפתחות מ-Vercel ({target}) אל {project}{env}: {names}",
+    "pull.githubNo": "אי אפשר לקרוא בחזרה סודות של GitHub — משיכה עובדת רק עם Vercel",
+    "diff.title": "{project}{env} ↔ {platform}{where}",
+    "diff.onlyVault": "רק בכספת",
+    "diff.onlyPlatform": "רק ב-{platform}",
+    "diff.changed": "ערך שונה",
+    "diff.same": "{n} זהים",
+    "diff.namesOnly": "(GitHub לא מציג ערכים — שמות בלבד)",
+    "cli.usage.push": "שימוש: kv push <vercel|github> [פרויקט] [--env e] [--target production|preview|development] [--sensitive] [--repo owner/name] [--environment name] [--dry-run]",
+    "cli.usage.pull": "שימוש: kv pull vercel [פרויקט] [--env e] [--target production|preview|development]",
+    "cli.usage.diff": "שימוש: kv diff <vercel|github> [פרויקט] [--env e] [--target …] [--repo owner/name] [--environment name]",
     "entry.noValue": "ל-{ref} אין ערך ל-{env}",
     "entry.exists": "{ref} כבר קיים",
     "project.exists": "הפרויקט {name} כבר קיים",
@@ -222,6 +261,9 @@ const HE: Record<MessageKey, string> = {
   kv example [פרויקט]            ‎.env.example מהכספת (שמות בלבד)
   kv check [פרויקט] [--file f] [--env e]   אילו מפתחות מ-.env.example חסרים
   kv mv <מ> <ל>                  שינוי שם למפתח (פרויקט/מפתח) או לפרויקט
+  kv push <vercel|github> [פרויקט] [--env e]   שליחת מפתחות הפרויקט (ערכים דרך stdin)
+  kv pull vercel [פרויקט] [--env e]            משיכת הערכים מ-Vercel לכספת
+  kv diff <vercel|github> [פרויקט] [--env e]   מה שונה (שמות בלבד, אף פעם לא ערכים)
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
   kv import-passwords <קובץ.csv> [--delete]   ייבוא סיסמאות מקובץ ייצוא של דפדפן (Chrome / Edge / Firefox)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)

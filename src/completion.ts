@@ -2,7 +2,7 @@
 // key names would mean unlocking the vault from a shell hook, which kv never does.
 
 export const COMMANDS = [
-  "init", "set", "get", "copy", "ls", "rm", "run", "env", "init-project", "example", "check", "mv",
+  "init", "set", "get", "copy", "ls", "rm", "run", "env", "init-project", "example", "check", "mv", "push", "pull", "diff",
   "import", "import-passwords", "ui", "unlock", "forget", "backup", "passwd", "lang", "status", "completion", "help",
 ] as const;
 
@@ -15,6 +15,9 @@ const FLAGS: Partial<Record<(typeof COMMANDS)[number], string[]>> = {
   env: ["--env", "--format", "--show", "sh", "pwsh", "fish", "dotenv", "json"],
   "init-project": ["--env", "--force"],
   check: ["--file", "--env"],
+  push: ["vercel", "github", "--env", "--target", "--sensitive", "--repo", "--environment", "--dry-run"],
+  pull: ["vercel", "--env", "--target"],
+  diff: ["vercel", "github", "--env", "--target", "--repo", "--environment", "--json"],
   ls: ["--json"],
   status: ["--json"],
   unlock: ["--remember"],
