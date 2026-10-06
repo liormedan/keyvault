@@ -65,6 +65,17 @@ kv example > .env.example          # names only, for the repo
 kv check                           # which names in .env.example the vault is missing
 ```
 
+## Ship to platforms
+
+```bash
+kv push vercel --env prod          # every key of the project → Vercel production (values via stdin, --sensitive optional)
+kv push github --repo me/my-app    # → GitHub Actions secrets (or --environment prod)
+kv diff vercel --env prod          # what's only here, only there, or different — names only; exit 1 if anything differs
+kv pull vercel --env prod          # Vercel's values into the vault
+```
+
+kv drives the platforms' own CLIs (`vercel`, `gh`), so it uses the login you already have. Values only ever travel on their stdin. GitHub secrets can't be read back, so `kv diff github` compares names and there is no `kv pull github`.
+
 ## Command line
 
 ```bash

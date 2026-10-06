@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — unreleased
+
+### Added
+
+- **`kv push vercel|github`** — every key of a project (for an environment) to Vercel environment variables or GitHub Actions secrets, through the `vercel` and `gh` CLIs you're already logged into. Values travel only on stdin. `--env prod` maps to Vercel's production target (`--target` to choose), `--sensitive`, `--repo`, `--environment`, `--dry-run`.
+- **`kv pull vercel`** — Vercel's values into the vault, through a private temp file deleted at once; Vercel's own `VERCEL_*` variables are left out.
+- **`kv diff vercel|github`** — only in the vault / only on the platform / different value (Vercel, compared by hash). Names only; `--json`; exit 1 when anything differs, so CI can gate on it.
+
+### Security
+
+- Arguments to platform CLIs are validated (names, targets, repo names, our own temp paths); shell metacharacters are refused before anything runs.
+
 ## 0.4.0 — unreleased
 
 ### Added
