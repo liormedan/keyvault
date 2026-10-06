@@ -27,9 +27,12 @@ export interface VaultFile extends VaultHeader {
 // ── Decrypted contents ──
 
 export interface DevEntry {
+  /** the default value — "" when the key only has per-environment values */
   value: string;
   note: string;
   updated: string;
+  /** per-environment overrides (dev, staging, prod, …) — added in 0.4, absent in older vaults */
+  envs?: Record<string, { value: string; updated: string }>;
 }
 
 export type ItemTypeName = "login" | "card" | "bank" | "identity" | "wifi" | "server" | "license" | "note";
@@ -85,6 +88,8 @@ export interface ListedDevKey {
   key: string;
   note: string;
   updated: string;
+  /** names of the environments with their own value */
+  envs?: string[];
 }
 
 /** A listed item — never any field */

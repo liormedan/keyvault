@@ -54,9 +54,9 @@ export function runCli(home: string, args: string[], env: Record<string, string>
 }
 
 /** Like runCli, but also the exit code, and stdout separately (for --json) */
-export function runCliFull(home: string, args: string[], env: Record<string, string> = {}): Promise<{ code: number | null; stdout: string; stderr: string }> {
+export function runCliFull(home: string, args: string[], env: Record<string, string> = {}, cwd?: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], { cwd, env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     c.stdout.on("data", (d: Buffer) => (stdout += d));

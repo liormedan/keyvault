@@ -82,16 +82,70 @@ export function getEntry(data: VaultData, project: string, name: string): DevEnt
   return e;
 }
 
-export function setEntry(data: VaultData, project: string, name: string, value: string, note?: string): void {
+/** Set the default value, or with `env` the value for that environment only */
+export function setEntry(data: VaultData, project: string, name: string, value: string, note?: string, env?: string): void {
   data.projects[project] ??= {};
   const prev = data.projects[project][name];
-  data.projects[project][name] = { value, note: note ?? prev?.note ?? "", updated: new Date().toISOString() };
+  const now = new Date().toISOString();
+  if (env) {
+    const entry: DevEntry = prev ?? { value: "", note: note ?? "", updated: now };
+    entry.envs = { ...entry.envs, [env]: { value, updated: now } };
+    if (note != null) entry.note = note;
+    entry.updated = now;
+    data.projects[project][name] = entry;
+    return;
+  }
+  data.projects[project][name] = { ...prev, value, note: note ?? prev?.note ?? "", updated: now };
 }
 
-export function deleteEntry(data: VaultData, project: string, name: string): void {
-  getEntry(data, project, name);
-  delete data.projects[project][name];
-  if (!Object.keys(data.projects[project]).length) delete data.projects[project];
+/** The value for an environment (its own, else the default); throws if there is none */
+export function entryValue(data: VaultData, project: string, name: string, env?: string): string {
+  const e = getEntry(data, project, name);
+  const v = (env && e.envs?.[env]?.value) || e.value;
+  if (!v) throw new Error(t("entry.noValue", { ref: `${project}/${name}`, env: env ?? "default" }));
+  return v;
+}
+
+/** Every key of a project with a value for this environment — what `kv run` and `kv env` inject */
+export function projectValues(data: VaultData, project: string, env?: string): Record<string, string> {
+  const keys = data.projects[project];
+  if (!keys) throw new Error(t("cli.noProject", { name: project }));
+  const out: Record<string, string> = {};
+  for (const [k, e] of Object.entries(keys)) {
+    const v = (env && e.envs?.[env]?.value) || e.value;
+    if (v) out[k] = v;
+  }
+  return out;
+}
+
+/** Delete a key, or with `env` only that environment's value */
+export function deleteEntry(data: VaultData, project: string, name: string, env?: string): void {
+  const e = getEntry(data, project, name);
+  if (env) {
+    if (!e.envs?.[env]) throw new Error(t("entry.notFound", { ref: `${project}/${name} --env ${env}` }));
+    delete e.envs[env];
+    if (!Object.keys(e.envs).length) delete e.envs;
+    if (e.value || e.envs) return;
+  }
+  delete data.projects[project]![name];
+  if (!Object.keys(data.projects[project]!).length) delete data.projects[project];
+}
+
+/** project/KEY → project/KEY (also across projects) */
+export function renameEntry(data: VaultData, from: [string, string], to: [string, string]): void {
+  const e = getEntry(data, from[0], from[1]);
+  if (data.projects[to[0]]?.[to[1]]) throw new Error(t("entry.exists", { ref: `${to[0]}/${to[1]}` }));
+  data.projects[to[0]] ??= {};
+  data.projects[to[0]][to[1]] = e;
+  delete data.projects[from[0]]![from[1]];
+  if (!Object.keys(data.projects[from[0]]!).length) delete data.projects[from[0]];
+}
+
+export function renameProject(data: VaultData, from: string, to: string): void {
+  if (!data.projects[from]) throw new Error(t("cli.noProject", { name: from }));
+  if (data.projects[to]) throw new Error(t("project.exists", { name: to }));
+  data.projects[to] = data.projects[from];
+  delete data.projects[from];
 }
 
 // Listing without values — safe to display
@@ -99,7 +153,7 @@ export function listing(data: VaultData): Record<string, ListedDevKey[]> {
   const out: Record<string, ListedDevKey[]> = {};
   for (const [p, keys] of Object.entries(data.projects)) {
     out[p] = Object.entries(keys)
-      .map(([k, e]) => ({ key: k, note: e.note, updated: e.updated }))
+      .map(([k, e]) => ({ key: k, note: e.note, updated: e.updated, ...(e.envs ? { envs: Object.keys(e.envs).sort() } : {}) }))
       .sort((a, b) => a.key.localeCompare(b.key));
   }
   return out;

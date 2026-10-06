@@ -24,6 +24,19 @@ const EN = {
     "ref.invalid": "Invalid name: \"{ref}\". Use project/KEY, e.g. my-app/API_KEY",
     "entry.notFound": "Not found: {ref}",
     "entry.missing": "Missing project, name or value (no / in the project name)",
+    "entry.noValue": "{ref} has no value for {env}",
+    "entry.exists": "{ref} already exists",
+    "project.exists": "Project {name} already exists",
+    "project.badFile": "{path} is not a valid kv project file — it needs {\"project\": \"name\"}",
+    "project.fileExists": "{path} already exists (--force replaces it)",
+    "project.none": "No project here: no .kv.json in this folder or above. Run kv init-project, or name the project.",
+    "cli.projectCreated": "Created {path} → project {name}. It holds only the name, so it is safe to commit.",
+    "cli.usage.mv": "Usage: kv mv <project/KEY> <project/KEY>   or   kv mv <project> <project>",
+    "cli.moved": "Moved {from} → {to}",
+    "cli.checkOk": "All {n} keys in {file} are in the vault ({project}).",
+    "cli.checkMissing": "Missing from the vault ({project}{env}): {names}",
+    "cli.envNoTty": "kv env prints values: pipe or eval it, e.g. eval \"$(kv env)\" (or --show)",
+    "cli.usage.format": "Unknown --format {format}: use sh, pwsh, fish, dotenv or json",
     "item.notFound": "Item not found",
     "item.fieldEmpty": "The field is empty",
     "item.unknownType": "Unknown type: {type}",
@@ -45,12 +58,18 @@ const EN = {
     "cli.help": `kv — kv-vault, a local vault for development keys
 
   kv init                          create a new vault (master password)
-  kv set  <project/KEY> [--note "..."]   add or update. The value is typed hidden, or piped in
+  kv set  <project/KEY> [--env e] [--note "..."]   add or update. The value is typed hidden, or piped in
   kv get  <project/KEY>            write the value to stdout — pipes only (kv get x | vercel env add ...)
   kv copy <project/KEY>            copy to the clipboard, cleared after 20 seconds
   kv ls   [project]                list names, never values
   kv rm   <project/KEY>            delete
-  kv run  <project> -- <command>   run a command with the project's keys as environment variables
+  kv run  [project] [--env e] -- <command>   run with the project's keys as environment variables
+                                   (no project: taken from .kv.json in this folder or above)
+  kv env  [project] [--env e] [--format sh|pwsh|fish|dotenv|json]   values for eval or a pipe
+  kv init-project [name] [--env e]  write .kv.json here (names only — safe to commit)
+  kv example [project]             .env.example from the vault (names only)
+  kv check [project] [--file f] [--env e]   which keys in .env.example are missing
+  kv mv <from> <to>                rename a key (project/KEY) or a project
   kv import <project> <file.env>   import an env file
   kv import-passwords <file.csv> [--delete]   import logins from a browser export (Chrome / Edge / Firefox)
   kv ui                            browser window to view, search and edit (local only)
@@ -157,6 +176,19 @@ const HE: Record<MessageKey, string> = {
     "ref.invalid": "שם לא תקין: \"{ref}\". הצורה: פרויקט/מפתח, למשל my-app/API_KEY",
     "entry.notFound": "לא נמצא: {ref}",
     "entry.missing": "חסר פרויקט, שם או ערך (בלי / בשם הפרויקט)",
+    "entry.noValue": "ל-{ref} אין ערך ל-{env}",
+    "entry.exists": "{ref} כבר קיים",
+    "project.exists": "הפרויקט {name} כבר קיים",
+    "project.badFile": "{path} אינו קובץ פרויקט תקין — צריך {\"project\": \"name\"}",
+    "project.fileExists": "{path} כבר קיים (‎--force מחליף אותו)",
+    "project.none": "אין כאן פרויקט: אין .kv.json בתיקייה הזו או מעליה. הרץ kv init-project, או ציין את שם הפרויקט.",
+    "cli.projectCreated": "נוצר {path} ← פרויקט {name}. יש בו רק את השם, אז בטוח להכניס אותו לגיט.",
+    "cli.usage.mv": "שימוש: kv mv <פרויקט/מפתח> <פרויקט/מפתח>   או   kv mv <פרויקט> <פרויקט>",
+    "cli.moved": "הועבר {from} ← {to}",
+    "cli.checkOk": "כל {n} המפתחות ב-{file} נמצאים בכספת ({project}).",
+    "cli.checkMissing": "חסרים בכספת ({project}{env}): {names}",
+    "cli.envNoTty": "kv env מדפיס ערכים: העבר אותו בצינור או ב-eval, למשל eval \"$(kv env)\" (או ‎--show)",
+    "cli.usage.format": "‎--format לא מוכר: {format}. אפשר sh, pwsh, fish, dotenv או json",
     "item.notFound": "הפריט לא נמצא",
     "item.fieldEmpty": "השדה ריק",
     "item.unknownType": "סוג לא מוכר: {type}",
@@ -178,12 +210,18 @@ const HE: Record<MessageKey, string> = {
     "cli.help": `kv — כספת מקומית למפתחות
 
   kv init                        יצירת כספת חדשה (סיסמת אב)
-  kv set  <פרויקט/מפתח> [--note "..."]   הוספה/עדכון. הערך מוקלד מוסתר, או מגיע מצינור
+  kv set  <פרויקט/מפתח> [--env e] [--note "..."]   הוספה/עדכון. הערך מוקלד מוסתר, או מגיע מצינור
   kv get  <פרויקט/מפתח>          כתיבת הערך ל-stdout — רק לצינור (kv get x | vercel env add ...)
   kv copy <פרויקט/מפתח>          העתקה ללוח, נמחק אחרי 20 שניות
   kv ls   [פרויקט]               רשימת שמות, בלי ערכים
   kv rm   <פרויקט/מפתח>          מחיקה
-  kv run  <פרויקט> -- <פקודה>     הרצת פקודה עם מפתחות הפרויקט כמשתני סביבה
+  kv run  [פרויקט] [--env e] -- <פקודה>   הרצה עם מפתחות הפרויקט כמשתני סביבה
+                                 (בלי פרויקט: מתוך .kv.json בתיקייה הזו או מעליה)
+  kv env  [פרויקט] [--env e] [--format sh|pwsh|fish|dotenv|json]   ערכים ל-eval או לצינור
+  kv init-project [שם] [--env e]  יוצר .kv.json כאן (שמות בלבד — בטוח לגיט)
+  kv example [פרויקט]            ‎.env.example מהכספת (שמות בלבד)
+  kv check [פרויקט] [--file f] [--env e]   אילו מפתחות מ-.env.example חסרים
+  kv mv <מ> <ל>                  שינוי שם למפתח (פרויקט/מפתח) או לפרויקט
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
   kv import-passwords <קובץ.csv> [--delete]   ייבוא סיסמאות מקובץ ייצוא של דפדפן (Chrome / Edge / Firefox)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)

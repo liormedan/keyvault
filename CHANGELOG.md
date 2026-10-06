@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 — unreleased
+
+### Added
+
+- **Project files.** `kv init-project` writes `.kv.json` (`{"project": "my-app"}` — names only, safe to commit). `kv run -- <cmd>`, `kv env`, `kv example` and `kv check` find the project from the current folder or any folder above.
+- **Environments.** Any key can have its own value per environment: `kv set my-app/DB_URL --env prod`, `kv run --env prod -- …`. Keys without one use their default. `.kv.json` can name a default environment for the folder. The desktop app shows which environments a key has.
+- **`kv env`** — the project's values as `sh`, `pwsh`, `fish`, `dotenv` or `json`, for `eval` or a pipe (refuses to print to a terminal, like `kv get`). Values are quoted so nothing in them is interpreted.
+- **`kv example`** (`.env.example`, names only) and **`kv check`** (exit 1 with the names the vault is missing).
+- **`kv mv`** — rename a key, move it to another project, or rename a project.
+
+### Changed
+
+- `kv run` and every command read their own flags before positional arguments, and stop at `--`: flags after it belong to the command being run.
+
 ## 0.3.0 — unreleased
 
 ### Added

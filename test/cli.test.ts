@@ -55,3 +55,44 @@ test("completion scripts: every shell, every command", () => {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   }
 });
+
+test("project workflow: init-project, run without a name, env formats, example, check, mv", { skip: process.platform !== "win32" && "unlocks through DPAPI remember-me" }, async () => {
+  // a vault with tricky values, remembered in the temp folder (same setup as the ls --json test)
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-cli-proj-"));
+  const tricky = "it's \"quoted\" $HOME ` back\\slash";
+  const setup = `import * as s from "./src/store.ts"; import * as r from "./src/remember.ts";
+    const { key, data } = await s.create("proj pw");
+    s.setEntry(data, "web", "API_KEY", "dev-key");
+    s.setEntry(data, "web", "API_KEY", "prod-key", undefined, "prod");
+    s.setEntry(data, "web", "TRICKY", ${JSON.stringify(tricky)});
+    await s.save(key, data); await r.remember(key, s.salt());`;
+  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], { env: { ...process.env, KV_HOME: home } });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kv-cli-repo-"));
+  fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "web" }));
+  const kv = (args: string[]) => runCliFull(home, args, {}, dir);
+
+  assert.equal((await kv(["init-project"])).code, 0);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, ".kv.json"), "utf8")), { project: "web" });
+
+  const printEnv = ["--", process.execPath, "-e", "process.stdout.write(process.env.API_KEY + '|' + process.env.TRICKY)"];
+  assert.equal((await kv(["run", ...printEnv])).stdout, `dev-key|${tricky}`, "project from .kv.json");
+  assert.equal((await kv(["run", "--env", "prod", ...printEnv])).stdout, `prod-key|${tricky}`);
+
+  assert.deepEqual(JSON.parse((await kv(["env", "--format", "json"])).stdout), { API_KEY: "dev-key", TRICKY: tricky });
+  // what eval gets back is exactly the value — quotes, $ and backslashes are not interpreted
+  const sh = (await kv(["env", "--format", "sh"])).stdout;
+  assert.equal(execFileSync("bash", ["-c", 'eval "$(cat)"; printf %s "$TRICKY"'], { input: sh, encoding: "utf8" }), tricky);
+  const pwsh = (await kv(["env", "--format", "pwsh", "--env", "prod"])).stdout;
+  assert.equal(execFileSync("powershell.exe", ["-NoProfile", "-Command", "Invoke-Expression ([Console]::In.ReadToEnd()); [Console]::Out.Write($env:API_KEY)"], { input: pwsh, encoding: "utf8" }), "prod-key");
+
+  assert.equal((await kv(["example"])).stdout, "API_KEY=\nTRICKY=\n");
+  fs.writeFileSync(path.join(dir, ".env.example"), "API_KEY=\nMISSING_ONE=\n");
+  const check = await kv(["check"]);
+  assert.equal(check.code, 1);
+  assert.match(check.stderr, /MISSING_ONE/);
+
+  assert.equal((await kv(["mv", "web/TRICKY", "web/QUOTED"])).code, 0);
+  assert.equal((await kv(["mv", "web", "site"])).code, 0);
+  assert.deepEqual(Object.keys(JSON.parse((await kv(["ls", "--json"])).stdout)), ["site"]);
+  assert.equal((await kv(["run", ...printEnv])).code, 1, ".kv.json still says web, which no longer exists");
+});

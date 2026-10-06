@@ -51,6 +51,20 @@ npm run app:installer    # builds the desktop installer (needs Rust + the Tauri 
 
 The installer is written to `app/src-tauri/target/release/bundle/nsis/`. It installs for the current user only (no admin rights) and adds Start menu and desktop shortcuts.
 
+## In a project
+
+```bash
+cd my-app
+kv init-project                    # writes .kv.json: {"project": "my-app"} — names only, commit it
+kv set my-app/DATABASE_URL         # typed hidden, or piped in
+kv set my-app/DATABASE_URL --env prod
+kv run -- npm run dev              # the project comes from .kv.json; keys arrive as env vars
+kv run --env prod -- npm start     # prod values where they exist, the default elsewhere
+eval "$(kv env)"                   # or load them into the current shell (pwsh: kv env | iex)
+kv example > .env.example          # names only, for the repo
+kv check                           # which names in .env.example the vault is missing
+```
+
 ## Command line
 
 ```bash
@@ -60,7 +74,11 @@ kv set my-app/API_KEY --note "prod key"   # value is typed hidden, or piped in
 kv ls [project]                           # names only, never values
 kv copy my-app/API_KEY                    # to the clipboard, cleared after 20 seconds
 kv get my-app/API_KEY | vercel env add API_KEY production   # pipes only; refuses to print to a terminal
-kv run my-app -- npm run dev              # run with the project's keys as environment variables
+kv run [my-app] [--env prod] -- npm run dev   # keys as environment variables (project from .kv.json if omitted)
+kv env [my-app] [--format sh|pwsh|fish|dotenv|json]   # values for eval or a pipe — refuses a terminal
+kv init-project [name]                    # .kv.json in this folder
+kv example | kv check                     # .env.example from the vault / what the vault is missing
+kv mv my-app/OLD my-app/NEW               # rename a key (or kv mv old-project new-project)
 kv import my-app .env.local               # import an existing env file (empty values are skipped)
 kv import-passwords passwords.csv --delete   # logins from a browser export; --delete removes the plaintext CSV
 kv backup [dir]                           # dated encrypted copy (default: KV_BACKUP_DIR or ~/.keyvault/backups)
