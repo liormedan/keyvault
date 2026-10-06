@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { copyWithClear } from "../src/io.ts";
+import { clearScript, copyWithClear } from "../src/io.ts";
 
 // Uses the real clipboard, so it only runs where KV_TEST_CLIPBOARD=1 (the Windows CI job) —
 // never on a developer's machine, where it would overwrite what they copied.
@@ -25,4 +25,12 @@ test("copy is private (no clipboard history, no cloud sync) and clears itself", 
   const said = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "(the clear never ran)";
   assert.equal(said, "cleared");
   assert.equal(ps("Get-Clipboard -Raw"), "", "cleared after the timeout");
+});
+
+test("the detached clear script is valid JavaScript and carries only the hash", () => {
+  const hash = "a".repeat(64);
+  const script = clearScript(hash, 20);
+  assert.doesNotThrow(() => new Function("require", script), "syntax error — the clear process would die at start");
+  assert.ok(script.includes(hash));
+  assert.ok(script.includes("20000"));
 });

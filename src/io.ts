@@ -64,14 +64,18 @@ const WIN_CLEAR_IF = (hash: string) =>
 // KV_CLIPBOARD_LOG (tests) records what the clear did.
 export function copyWithClear(value: string, seconds: number = 20): void {
   execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
-  const clear = [
+  spawn(process.execPath, ["-e", clearScript(sha(value), seconds)], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+/** The detached clear process's code (exported so a test can check it parses) */
+export function clearScript(hash: string, seconds: number): string {
+  return [
     `const { execFileSync } = require("node:child_process");`,
     `setTimeout(() => {`,
     `  let out;`,
-    `  try { out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(sha(value)))}], { encoding: "utf8", windowsHide: true }).trim(); }`,
+    `  try { out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(hash))}], { encoding: "utf8", windowsHide: true }).trim(); }`,
     `  catch (e) { out = "failed: " + e.message; }`,
     `  if (process.env.KV_CLIPBOARD_LOG) require("node:fs").writeFileSync(process.env.KV_CLIPBOARD_LOG, out);`,
     `}, ${Math.max(0, Math.floor(seconds)) * 1000});`,
-  ].join(";");
-  spawn(process.execPath, ["-e", clear], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  ].join(String.fromCharCode(10));
 }
