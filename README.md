@@ -4,8 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/liormedan/kv-vault)](https://github.com/liormedan/kv-vault/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A local, encrypted vault for the keys and passwords a developer collects: API keys per project, logins, cards, bank details, IDs, Wi-Fi, servers, licenses and secure notes.
-One encrypted file on your machine, a Windows desktop app, and a `kv` command line. Nothing leaves the computer.
+A local, encrypted vault for a developer's API keys — one file, no account, no server.
+`kv run -- npm run dev` injects a project's keys as environment variables, so there's no `.env` file to leak.
+A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app that also keeps logins, cards and notes.
 
 ![kv-vault desktop app](docs/screenshot.png)
 
@@ -16,19 +17,29 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 - **One encrypted file** — `~/.keyvault/vault.kv`. Argon2id key derivation and XChaCha20-Poly1305 encryption, both from [libsodium](https://doc.libsodium.org/). Project and key names are encrypted too.
 - **Desktop app** (Tauri 2) — dark or light theme, categories, search, favorites, reveal / copy / edit / delete, auto-lock after 15 idle minutes.
 - **Typed items** — login, credit card, bank account, identity document, Wi-Fi, server/SSH, software license, secure note — plus dev keys grouped by project.
-- **Secrets stay hidden** — secret fields never appear in lists and reach the window only when you click reveal. Copy goes straight to the clipboard and is cleared after 20 seconds.
+- **Secrets stay hidden** — secret fields never appear in lists and reach the window only when you click reveal. Copy goes straight to the clipboard, is cleared after 20 seconds, and on Windows stays out of clipboard history and cloud sync. The vault locks when Windows locks.
 - **Import from browsers** — pick the password CSV exported by Chrome, Edge, Firefox or Safari (also Bitwarden, LastPass, 1Password). Duplicates are skipped, and the app offers to delete the plaintext export afterwards.
 - **Password generator** — 20 characters by default, randomness from libsodium.
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
-- **Remember me (Windows)** — the derived key, not the password, is stored with DPAPI so only your Windows user can unlock without typing.
+- **Remember me** — the derived key, not the password, goes to the system's own secret store: DPAPI on Windows, Keychain on macOS, Secret Service (GNOME Keyring / KWallet) on Linux.
+- **Scriptable** — `--json` output, exit codes `0` ok · `1` failed · `2` wrong arguments, shell completion.
 
 ## Install
 
-**Download:** the installer is attached to each [release](https://github.com/liormedan/kv-vault/releases/latest) (`kv-vault_x.y.z_x64-setup.exe`). It installs for the current user only and needs [Node.js](https://nodejs.org/) 22.6+ on the machine.
+```bash
+npm install -g kv-vault     # Node.js 22.6+ · Windows, macOS, Linux
+kv init
+```
+
+Shell completion: `source <(kv completion bash)` (also `zsh`, `fish`, `powershell` — see `kv completion`).
+
+**Desktop app (Windows):** the installer is attached to each [release](https://github.com/liormedan/kv-vault/releases/latest) (`kv-vault_x.y.z_x64-setup.exe`). It installs for the current user only and needs Node.js 22.6+.
+
+Every release is built and published by GitHub Actions: the npm package carries [provenance](https://docs.npmjs.com/generating-provenance-statements) and the installer a build attestation, both linking back to the workflow run.
 
 **From source:**
 
-Requirements: Windows 10/11 and [Node.js](https://nodejs.org/) 22.6 or newer.
+Requirements: [Node.js](https://nodejs.org/) 22.6 or newer; Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for the desktop app. On Linux, `kv copy` needs `wl-clipboard` (Wayland) or `xclip` (X11).
 
 ```bash
 git clone https://github.com/liormedan/kv-vault.git
@@ -57,6 +68,8 @@ kv passwd                                 # change the master password
 kv forget                                 # drop "remember me"
 kv ui                                     # browser UI on 127.0.0.1 (if you don't use the desktop app)
 kv lang <en|he>                           # interface language (also: KV_LANG)
+kv status [--json]                        # version, vault path, remembered, language
+kv ls --json                              # machine-readable: names and notes, never values
 ```
 
 Data lives in `~/.keyvault/` (the project's original name — kept so existing vaults keep working).

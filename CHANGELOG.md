@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — unreleased
+
+### Added
+
+- **macOS and Linux.** The `kv` CLI runs on all three; CI tests Windows, macOS and Ubuntu.
+- **`npm install -g kv-vault`.** Published from GitHub Actions with npm provenance; the Windows installer is built there too, with a build attestation and its SHA-256 in the release notes.
+- **Remember me through the system keychain** on macOS (Keychain) and Linux (Secret Service). Windows keeps DPAPI.
+- **Clipboard on macOS and Linux** (`pbcopy`, `wl-copy`, `xclip`), with the same 20-second clear.
+- `kv --version`, `kv status [--json]`, `kv ls --json` (names only), `kv completion <bash|zsh|fish|powershell>`.
+- Documented exit codes: `0` ok · `1` failed · `2` wrong arguments.
+
 ## 0.2.1 — 2026-10-06
 
 ### Changed

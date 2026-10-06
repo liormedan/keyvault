@@ -5,7 +5,8 @@ import fs from "node:fs";
 
 // libsodium is CommonJS-flavored; bundled into ESM it needs a real `require`
 const nodeBanner = "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);";
-const node = { bundle: true, platform: "node", format: "esm", target: "node20", logLevel: "warning", legalComments: "none" };
+// @napi-rs/keyring is native (macOS/Linux "remember me"): installed as a dependency, never bundled
+const node = { bundle: true, platform: "node", format: "esm", target: "node20", logLevel: "warning", legalComments: "none", external: ["@napi-rs/keyring"] };
 const browser = { bundle: true, platform: "browser", format: "iife", target: "es2022", logLevel: "warning", legalComments: "none" };
 
 const entry = (base) => [`${base}.ts`, `${base}.js`].find((f) => fs.existsSync(f));

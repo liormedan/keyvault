@@ -17,6 +17,7 @@ const EN = {
     "pw.wrong": "Wrong master password, or the file was modified",
     "remember.stale": "The remembered key is no longer valid — master password required",
     "remember.windowsOnly": "Remember me is available on Windows only",
+    "remember.unavailable": "Remember me is not available here: no system keychain. On Linux, install and unlock a Secret Service (GNOME Keyring or KWallet).",
     "vault.none": "No vault at {path}. Run: kv init",
     "vault.exists": "A vault already exists at {path}",
     "kdf.unknown": "Unknown algorithm: {alg}",
@@ -38,6 +39,7 @@ const EN = {
     "op.unknown": "Unknown action: {name}",
     "tty.none": "No terminal to type a password. Run first: kv unlock --remember",
     "cancelled": "Cancelled",
+    "clipboard.unavailable": "Could not copy: {tool} failed ({reason}). On Linux install wl-clipboard (Wayland) or xclip (X11).",
     "lang.invalid": "Unknown language: {lang}. Use: en, he",
 
     "cli.help": `kv — kv-vault, a local vault for development keys
@@ -57,6 +59,11 @@ const EN = {
   kv backup [dir]                  dated encrypted copy (default: KV_BACKUP_DIR, or backups next to the vault)
   kv passwd                        change the master password
   kv lang <en|he>                  interface language
+  kv status [--json]               version, vault path, remembered, language
+  kv completion <shell>            shell completion (bash, zsh, fish, powershell)
+
+  --json on ls and status prints machine-readable output (names only, never values).
+  Exit codes: 0 ok · 1 failed · 2 wrong arguments.
 
 Vault: {vault}`,
     "cli.prompt.password": "Master password: ",
@@ -78,6 +85,13 @@ Vault: {vault}`,
     "cli.usage.importPasswords": "Usage: kv import-passwords <file.csv> [--delete]",
     "cli.usage.unlock": "Usage: kv unlock --remember",
     "cli.usage.lang": "Usage: kv lang <en|he>",
+    "cli.usage.completion": "Usage: kv completion <bash|zsh|fish|powershell>",
+    "cli.status.vault": "Vault",
+    "cli.status.none": "not created yet — run kv init",
+    "cli.status.remembered": "Remembered on this computer",
+    "cli.status.yes": "yes",
+    "cli.status.no": "no",
+    "cli.status.lang": "Language",
     "cli.importedFrom": "imported from {file}",
     "cli.imported": "Imported {n} keys into {project}: {names}",
     "cli.skippedEmpty": "Skipped (empty in the file): {names}",
@@ -136,6 +150,7 @@ const HE: Record<MessageKey, string> = {
     "pw.wrong": "סיסמת אב שגויה, או שהקובץ שונה",
     "remember.stale": "הזכירה לא תקפה יותר — נדרשת סיסמת אב",
     "remember.windowsOnly": "זכירה זמינה רק ב-Windows",
+    "remember.unavailable": "זכירה לא זמינה כאן: אין מחזיק מפתחות של המערכת. ב-Linux צריך Secret Service פעיל (GNOME Keyring או KWallet).",
     "vault.none": "אין כספת ב-{path}. הרץ: kv init",
     "vault.exists": "כבר קיימת כספת ב-{path}",
     "kdf.unknown": "אלגוריתם לא מוכר: {alg}",
@@ -157,6 +172,7 @@ const HE: Record<MessageKey, string> = {
     "op.unknown": "פעולה לא מוכרת: {name}",
     "tty.none": "אין טרמינל להקלדת סיסמה. הרץ קודם: kv unlock --remember",
     "cancelled": "בוטל",
+    "clipboard.unavailable": "ההעתקה נכשלה: {tool} ({reason}). ב-Linux צריך להתקין wl-clipboard (Wayland) או xclip (X11).",
     "lang.invalid": "שפה לא מוכרת: {lang}. אפשר: en, he",
 
     "cli.help": `kv — כספת מקומית למפתחות
@@ -176,6 +192,11 @@ const HE: Record<MessageKey, string> = {
   kv backup [תיקייה]             עותק מוצפן עם תאריך (ברירת מחדל: KV_BACKUP_DIR, או backups ליד הכספת)
   kv passwd                      החלפת סיסמת אב
   kv lang <en|he>                שפת הממשק
+  kv status [--json]             גרסה, מיקום הכספת, זכירה, שפה
+  kv completion <shell>          השלמה אוטומטית (bash, zsh, fish, powershell)
+
+  --json ב-ls וב-status מדפיס פלט למכונה (שמות בלבד, אף פעם לא ערכים).
+  קודי יציאה: 0 הצליח · 1 נכשל · 2 ארגומנטים שגויים.
 
 הכספת: {vault}`,
     "cli.prompt.password": "סיסמת אב: ",
@@ -197,6 +218,13 @@ const HE: Record<MessageKey, string> = {
     "cli.usage.importPasswords": "שימוש: kv import-passwords <קובץ.csv> [--delete]",
     "cli.usage.unlock": "שימוש: kv unlock --remember",
     "cli.usage.lang": "שימוש: kv lang <en|he>",
+    "cli.usage.completion": "שימוש: kv completion <bash|zsh|fish|powershell>",
+    "cli.status.vault": "כספת",
+    "cli.status.none": "עוד לא נוצרה — הרץ kv init",
+    "cli.status.remembered": "זכורה במחשב הזה",
+    "cli.status.yes": "כן",
+    "cli.status.no": "לא",
+    "cli.status.lang": "שפה",
     "cli.importedFrom": "יובא מ-{file}",
     "cli.imported": "יובאו {n} מפתחות ל-{project}: {names}",
     "cli.skippedEmpty": "דולגו (ריקים בקובץ): {names}",

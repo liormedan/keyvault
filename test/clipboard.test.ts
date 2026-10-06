@@ -8,29 +8,36 @@ import { clearScript, copyWithClear } from "../src/io.ts";
 
 // Uses the real clipboard, so it only runs where KV_TEST_CLIPBOARD=1 (the Windows CI job) —
 // never on a developer's machine, where it would overwrite what they copied.
-const enabled = process.platform === "win32" && process.env.KV_TEST_CLIPBOARD === "1";
+const enabled = process.env.KV_TEST_CLIPBOARD === "1";
+const windows = process.platform === "win32";
 const ps = (script: string) => execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script], { encoding: "utf8" }).trim();
+const paste = () => (windows ? ps("Get-Clipboard -Raw") : execFileSync("pbpaste", { encoding: "utf8" }));
 
-test("copy is private (no clipboard history, no cloud sync) and clears itself", { skip: !enabled && "set KV_TEST_CLIPBOARD=1 (CI only)" }, async () => {
+test("copy works, is private on Windows (no history, no cloud sync) and clears itself", { skip: !enabled && "set KV_TEST_CLIPBOARD=1 (CI only)" }, async () => {
   const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "kv-clip-")), "clear.log");
   process.env.KV_CLIPBOARD_LOG = log;
   copyWithClear("clipboard-test-value-שלום", 2);
-  assert.equal(ps("Get-Clipboard -Raw"), "clipboard-test-value-שלום");
+  assert.equal(paste(), "clipboard-test-value-שלום");
+  if (windows) {
   const formats = ps("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetDataObject().GetFormats() -join ','");
   for (const f of ["ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]) {
     assert.ok(formats.includes(f), `${f} missing — the value would land in clipboard history`);
+  }
   }
   // the clear starts a fresh PowerShell: allow for a slow start on CI
   for (let i = 0; i < 30 && !fs.existsSync(log); i++) await new Promise((r) => setTimeout(r, 1000));
   const said = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "(the clear never ran)";
   assert.equal(said, "cleared");
-  assert.equal(ps("Get-Clipboard -Raw"), "", "cleared after the timeout");
+  assert.equal(paste(), "", "cleared after the timeout");
 });
 
 test("the detached clear script is valid JavaScript and carries only the hash", () => {
   const hash = "a".repeat(64);
+  for (const tl of ["windows", { copy: ["pbcopy", []], read: ["pbpaste", []], clear: ["pbcopy", []] }] as const) {
+    const script = clearScript(hash, 20, tl as Parameters<typeof clearScript>[2]);
+    assert.doesNotThrow(() => new Function("require", script), "syntax error — the clear process would die at start");
+  }
   const script = clearScript(hash, 20);
-  assert.doesNotThrow(() => new Function("require", script), "syntax error — the clear process would die at start");
   assert.ok(script.includes(hash));
   assert.ok(script.includes("20000"));
 });

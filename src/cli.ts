@@ -3,7 +3,10 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import * as dpapi from "./dpapi.ts";
+import pkg from "../package.json" with { type: "json" };
+import { completion, SHELLS, type Shell } from "./completion.ts";
+import { getLang } from "./i18n.ts";
+import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { readLoginsFile } from "./import-csv.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
@@ -24,15 +27,18 @@ const has = (name: string): boolean => {
   args.splice(i, 1);
   return true;
 };
+/** Wrong arguments: exit code 2 (other failures exit 1) */
+class UsageError extends Error {}
+const json = () => has("--json");
 const err = (msg: string) => process.stderr.write(`${msg}\n`);
 
 async function unlock(): Promise<store.Session> {
-  const cached = dpapi.recall(store.salt());
+  const cached = await remember.recall(store.salt());
   if (cached) {
     try {
       return await store.unlockWithKey(cached);
     } catch {
-      dpapi.forget();
+      await remember.forget();
     }
   }
   return store.unlockWithPassword(await readHidden(t("cli.prompt.password")));
@@ -94,10 +100,16 @@ const commands: Record<string, () => Promise<void>> = {
   },
 
   async ls() {
+    const asJson = json();
     const only = args.shift();
     const { data } = await unlock();
     const list = store.listing(data);
     const names = Object.keys(list).filter((p) => !only || p === only).sort();
+    if (asJson) {
+      // names and notes only — never values
+      console.log(JSON.stringify(Object.fromEntries(names.map((p) => [p, list[p]])), null, 2));
+      return;
+    }
     if (!names.length) {
       err(only ? t("cli.noProject", { name: only }) : t("cli.empty"));
       return;
@@ -120,7 +132,7 @@ const commands: Record<string, () => Promise<void>> = {
     const p = args.shift();
     const sep = args.indexOf("--");
     const command = sep >= 0 ? args.slice(sep + 1) : args;
-    if (!p || !command.length) throw new Error(t("cli.usage.run"));
+    if (!p || !command.length) throw new UsageError(t("cli.usage.run"));
     const { data } = await unlock();
     const keys = data.projects[p];
     if (!keys) throw new Error(t("cli.noProject", { name: p }));
@@ -138,7 +150,7 @@ const commands: Record<string, () => Promise<void>> = {
   async import() {
     const p = args.shift();
     const file = args.shift();
-    if (!p || !file) throw new Error(t("cli.usage.import"));
+    if (!p || !file) throw new UsageError(t("cli.usage.import"));
     const all = Object.entries(parseEnv(fs.readFileSync(file, "utf8")));
     const pairs = all.filter(([, v]) => v !== "");
     const empty = all.filter(([, v]) => v === "").map(([k]) => k);
@@ -153,7 +165,7 @@ const commands: Record<string, () => Promise<void>> = {
   async "import-passwords"() {
     const del = has("--delete");
     const file = args.shift();
-    if (!file) throw new Error(t("cli.usage.importPasswords"));
+    if (!file) throw new UsageError(t("cli.usage.importPasswords"));
     const { logins, skipped } = readLoginsFile(file);
     const { key, data } = await unlock();
     const { added, duplicates } = store.importLogins(data, logins);
@@ -168,14 +180,14 @@ const commands: Record<string, () => Promise<void>> = {
   },
 
   async unlock() {
-    if (!has("--remember")) throw new Error(t("cli.usage.unlock"));
+    if (!has("--remember")) throw new UsageError(t("cli.usage.unlock"));
     const { key } = await store.unlockWithPassword(await readHidden(t("cli.prompt.password")));
-    dpapi.remember(key, store.salt());
+    await remember.remember(key, store.salt());
     err(t("cli.remembered"));
   },
 
   async forget() {
-    dpapi.forget();
+    await remember.forget();
     err(t("cli.forgotten"));
   },
 
@@ -203,15 +215,31 @@ const commands: Record<string, () => Promise<void>> = {
       fs.copyFileSync(bak, store.VAULT);
       throw e;
     }
-    dpapi.forget();
+    await remember.forget();
     err(t("cli.passwdChanged"));
   },
 
   async lang() {
     const l = args.shift();
-    if (!l) throw new Error(t("cli.usage.lang"));
+    if (!l) throw new UsageError(t("cli.usage.lang"));
     saveLang(l);
     err(t("cli.langSet"));
+  },
+
+  async status() {
+    const asJson = json();
+    const s = { version: pkg.version, vault: store.VAULT, exists: store.exists(), remembered: remember.remembered(), lang: getLang() };
+    if (asJson) return console.log(JSON.stringify(s, null, 2));
+    console.log(`kv-vault ${s.version}
+${t("cli.status.vault")}: ${s.vault}${s.exists ? "" : ` (${t("cli.status.none")})`}
+${t("cli.status.remembered")}: ${s.remembered ? t("cli.status.yes") : t("cli.status.no")}
+${t("cli.status.lang")}: ${s.lang}`);
+  },
+
+  async completion() {
+    const shell = args.shift() as Shell | undefined;
+    if (!shell || !SHELLS.includes(shell)) throw new UsageError(t("cli.usage.completion"));
+    process.stdout.write(completion(shell));
   },
 
   async ui() {
@@ -221,15 +249,17 @@ const commands: Record<string, () => Promise<void>> = {
 };
 
 try {
-  if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
+  if (cmd === "--version" || cmd === "-v" || cmd === "version") {
+    console.log(pkg.version);
+  } else if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
     console.log(t("cli.help", { vault: store.VAULT }));
   } else if (!Object.hasOwn(commands, cmd)) {
     // hasOwn: "toString" or "constructor" are not commands
-    throw new Error(t("cli.unknownCommand", { cmd }));
+    throw new UsageError(t("cli.unknownCommand", { cmd }));
   } else {
     await commands[cmd]!();
   }
 } catch (e) {
   err(`kv: ${(e as Error).message}`);
-  process.exit(1);
+  process.exit(e instanceof UsageError ? 2 : 1);
 }
