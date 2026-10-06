@@ -19,6 +19,7 @@
 ### Fixed
 
 - File-system races CodeQL flagged in `kv guard` and `kv scan`: files are now checked and read (or written) through one handle.
+- **The desktop app couldn't start its backend from a verbatim Windows path** (`\\?\D:\…`, which Tauri can return): Node failed with `EISDIR: lstat 'D:'` and the window showed "locked". Found by the window test on GitHub's runner. The prefix is now dropped for drive paths, and `KV_BACKEND_LOG` lets a test collect the backend's startup errors.
 
 ## 0.6.0 — unreleased
 
