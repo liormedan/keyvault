@@ -58,23 +58,58 @@ const WIN_CLEAR_IF = (hash: string) =>
   "$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c))).Replace('-','').ToLower(); " +
   `if ($h -eq '${hash}') { [System.Windows.Forms.Clipboard]::Clear(); 'cleared' } else { 'changed since - left alone' } } else { 'empty' }`;
 
+/** One clipboard tool per platform: [command, args] to write (value on stdin), read, and clear */
+interface Tool {
+  copy: [string, string[]];
+  read: [string, string[]];
+  clear: [string, string[]];
+}
+
+function tool(): Tool | "windows" {
+  if (process.platform === "win32") return "windows";
+  if (process.platform === "darwin") return { copy: ["pbcopy", []], read: ["pbpaste", []], clear: ["pbcopy", []] };
+  if (process.env.WAYLAND_DISPLAY) return { copy: ["wl-copy", []], read: ["wl-paste", ["--no-newline"]], clear: ["wl-copy", ["--clear"]] };
+  return { copy: ["xclip", ["-selection", "clipboard"]], read: ["xclip", ["-selection", "clipboard", "-o"]], clear: ["xclip", ["-selection", "clipboard"]] };
+}
+
 // Copies to the clipboard and clears it after `seconds` — only if it still holds the same value (compares a hash, not the value).
 // The clear must outlive `kv copy`, so it runs in a detached Node process. (A detached PowerShell doesn't start at
 // all on Windows, and a non-detached child dies with its parent.) Only the hash crosses the command line.
 // KV_CLIPBOARD_LOG (tests) records what the clear did.
 export function copyWithClear(value: string, seconds: number = 20): void {
-  execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
-  spawn(process.execPath, ["-e", clearScript(sha(value), seconds)], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  const tl = tool();
+  try {
+    if (tl === "windows") {
+      execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
+    } else {
+      execFileSync(tl.copy[0], tl.copy[1], { input: value, stdio: ["pipe", "ignore", "ignore"] });
+    }
+  } catch (e) {
+    const name = tl === "windows" ? "powershell.exe" : tl.copy[0];
+    throw new Error(t("clipboard.unavailable", { tool: name, reason: (e as Error).message.split(String.fromCharCode(10))[0] ?? "" }));
+  }
+  spawn(process.execPath, ["-e", clearScript(sha(value), seconds, tl)], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
 
 /** The detached clear process's code (exported so a test can check it parses) */
-export function clearScript(hash: string, seconds: number): string {
+export function clearScript(hash: string, seconds: number, tl: Tool | "windows" = tool()): string {
+  const body =
+    tl === "windows"
+      ? [`out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(hash))}], { encoding: "utf8", windowsHide: true }).trim();`]
+      : [
+          `const now = execFileSync(${JSON.stringify(tl.read[0])}, ${JSON.stringify(tl.read[1])}, { encoding: "utf8" });`,
+          `const h = require("node:crypto").createHash("sha256").update(now, "utf8").digest("hex");`,
+          `if (!now) out = "empty";`,
+          `else if (h !== ${JSON.stringify(hash)}) out = "changed since - left alone";`,
+          `else { execFileSync(${JSON.stringify(tl.clear[0])}, ${JSON.stringify(tl.clear[1])}, { input: "" }); out = "cleared"; }`,
+        ];
   return [
     `const { execFileSync } = require("node:child_process");`,
     `setTimeout(() => {`,
     `  let out;`,
-    `  try { out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(hash))}], { encoding: "utf8", windowsHide: true }).trim(); }`,
-    `  catch (e) { out = "failed: " + e.message; }`,
+    `  try {`,
+    ...body.map((l) => `    ${l}`),
+    `  } catch (e) { out = "failed: " + e.message; }`,
     `  if (process.env.KV_CLIPBOARD_LOG) require("node:fs").writeFileSync(process.env.KV_CLIPBOARD_LOG, out);`,
     `}, ${Math.max(0, Math.floor(seconds)) * 1000});`,
   ].join(String.fromCharCode(10));

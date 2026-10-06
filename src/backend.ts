@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { randomPassword, wipe } from "./crypto.ts";
-import * as dpapi from "./dpapi.ts";
+import * as remember from "./remember.ts";
 import { getLang, setLang, t } from "./i18n.ts";
 import type { Handlers, Method, Reply } from "./protocol.ts";
 import { LOCKED } from "./protocol.ts";
@@ -45,8 +45,8 @@ const methods = {
   status: () => ({
     exists: store.exists(),
     unlocked: !!session,
-    remembered: dpapi.remembered(),
-    rememberSupported: dpapi.supported,
+    remembered: remember.remembered(),
+    rememberSupported: remember.supported,
     vault: store.VAULT,
   }),
 
@@ -56,25 +56,25 @@ const methods = {
     return { ok: true as const };
   },
 
-  async unlock({ password, remember }) {
+  async unlock({ password, remember: rememberMe }) {
     if (password) {
       session = await store.unlockWithPassword(String(password));
-      if (remember) dpapi.remember(session.key, store.salt());
+      if (rememberMe) await remember.remember(session.key, store.salt());
       return { ok: true as const };
     }
-    const cached = dpapi.recall(store.salt());
+    const cached = await remember.recall(store.salt());
     if (!cached) throw new Error(t("pw.required"));
     try {
       session = await store.unlockWithKey(cached);
     } catch {
-      dpapi.forget();
+      await remember.forget();
       throw new Error(t("remember.stale"));
     }
     return { ok: true as const };
   },
 
   lock: () => (lock(), { ok: true as const }),
-  forget: () => (dpapi.forget(), { ok: true as const }),
+  forget: async () => (await remember.forget(), { ok: true as const }),
 
   list: () => ({ projects: store.listing(need().data) }),
 

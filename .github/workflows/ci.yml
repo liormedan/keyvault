@@ -11,8 +11,9 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -24,5 +25,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test
         env:
-          KV_TEST_CLIPBOARD: ${{ matrix.os == 'windows-latest' && '1' || '' }}
+          KV_TEST_CLIPBOARD: ${{ matrix.os != 'ubuntu-latest' && '1' || '' }}
+          KV_TEST_KEYCHAIN: ${{ matrix.os == 'macos-latest' && '1' || '' }}
       - run: npm run build

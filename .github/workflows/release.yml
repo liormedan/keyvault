@@ -1,0 +1,71 @@
+# Push a tag vX.Y.Z → build and test on clean runners, then:
+#   · npm: publish kv-vault with provenance (a signed link from the package to this workflow run)
+#   · GitHub Release: the Windows installer + its SHA-256, with a build attestation
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance / trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Version matches the tag
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  desktop:
+    runs-on: windows-latest
+    permissions:
+      contents: write # create the release and upload the installer
+      id-token: write # build attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - run: npm ci
+      - run: npm run app:installer
+      - name: Installer path and checksum
+        id: installer
+        shell: bash
+        run: |
+          f=$(ls app/src-tauri/target/release/bundle/nsis/*_x64-setup.exe)
+          echo "file=$f" >> "$GITHUB_OUTPUT"
+          echo "sha=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.installer.outputs.file }}
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          printf '\n### Install\n\n- **CLI:** `npm i -g kv-vault` (Node.js 22.6+), then `kv help`\n- **Desktop (Windows):** download the installer below. Installs for the current user only.\n\nSHA-256 of the installer: `%s` — and a [build attestation](https://github.com/%s/attestations) shows it was built by this repository'"'"'s release workflow.\n' "${{ steps.installer.outputs.sha }}" "$GITHUB_REPOSITORY" >> notes.md
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "kv-vault ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag "${{ steps.installer.outputs.file }}"
