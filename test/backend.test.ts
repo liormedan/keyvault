@@ -1,38 +1,15 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import readline from "node:readline";
-import { after, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-// The backend and CLI import .ts modules; Node runs them with type stripping
-const NODE_TS = ["--experimental-strip-types", "--no-warnings=ExperimentalWarning"];
+import { test } from "node:test";
+import { runBackendBatch, runCli, startBackend } from "./helpers.ts";
 
 // The desktop backend against a temporary vault — never the real one
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-"));
 const PW = "backend test password";
 
-function start() {
-  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.ts", import.meta.url))], {
-    env: { ...process.env, KV_HOME: HOME },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  after(() => child.kill());
-  let stderr = "";
-  child.stderr.on("data", (c) => (stderr += c));
-  const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();
-  let id = 0;
-  const call = async (method, params) => {
-    child.stdin.write(`${JSON.stringify({ id: ++id, method, params })}\n`);
-    const { value } = await lines.next();
-    const res = JSON.parse(value);
-    assert.equal(res.id, id);
-    return res;
-  };
-  return { call, stop: () => child.stdin.end(), stderr: () => stderr };
-}
+const start = () => startBackend(HOME);
 
 test("app backend: create, lock, unlock, CRUD, no values on stderr", async () => {
   const b = start();
@@ -76,14 +53,7 @@ test("app backend: remember (DPAPI) in the temp folder", { skip: process.platfor
 
 test("app backend: closing stdin finishes a pending save before exiting", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-backend-close-"));
-  const script = fileURLToPath(new URL("../src/backend.ts", import.meta.url));
-  const run = (lines) => new Promise((resolve) => {
-    const child = spawn(process.execPath, [...NODE_TS, script], { env: { ...process.env, KV_HOME: home }, stdio: ["pipe", "pipe", "ignore"] });
-    let out = "";
-    child.stdout.on("data", (c) => (out += c));
-    child.on("exit", () => resolve(out.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))));
-    child.stdin.end(lines.map((l) => JSON.stringify(l)).join("\n") + "\n"); // write and close at once
-  });
+  const run = (requests: Parameters<typeof runBackendBatch>[1]) => runBackendBatch(home, requests);
   const first = await run([
     { id: 1, method: "init", params: { password: PW } },
     { id: 2, method: "set", params: { p: "demo", k: "K", value: "kept" } },
@@ -93,7 +63,7 @@ test("app backend: closing stdin finishes a pending save before exiting", async 
     { id: 1, method: "unlock", params: { password: PW } },
     { id: 2, method: "value", params: { p: "demo", k: "K" } },
   ]);
-  assert.equal(second[1].result.value, "kept");
+  assert.equal(second[1]?.result.value, "kept");
 });
 
 test("app backend: setLang switches error messages to Hebrew and back", async () => {
@@ -111,14 +81,7 @@ test("app backend: setLang switches error messages to Hebrew and back", async ()
 
 test("cli: English by default, Hebrew with KV_LANG or kv lang", async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-lang-"));
-  const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
-  const run = (args, env = {}) => new Promise((resolve) => {
-    const c = spawn(process.execPath, [...NODE_TS, cli, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "";
-    c.stdout.on("data", (d) => (out += d));
-    c.stderr.on("data", (d) => (out += d));
-    c.on("exit", () => resolve(out));
-  });
+  const run = (args: string[], env: Record<string, string> = {}) => runCli(home, args, env);
   assert.match(await run(["ls"]), /No vault at/);
   assert.match(await run(["toString"]), /Unknown command: toString/, "prototype names are not commands");
   assert.match(await run(["ls"], { KV_LANG: "he" }), /אין כספת/);

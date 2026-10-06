@@ -1,14 +1,9 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import readline from "node:readline";
-import { after, test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-// The backend and CLI import .ts modules; Node runs them with type stripping
-const NODE_TS = ["--experimental-strip-types", "--no-warnings=ExperimentalWarning"];
+import { test } from "node:test";
+import { startBackend } from "./helpers.ts";
 
 // Temporary vault — never the real one. All CSV data here is made up.
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-import-"));
@@ -74,19 +69,8 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
   const other = path.join(HOME, "keep.txt");
   fs.writeFileSync(csv, FIREFOX + '\n"https://new.example","dana","pw-new",,"","{3}","1","2","3"\n');
   fs.writeFileSync(other, "keep");
-  const child = spawn(process.execPath, [...NODE_TS, fileURLToPath(new URL("../src/backend.ts", import.meta.url))], {
-    env: { ...process.env, KV_HOME: HOME },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  after(() => child.kill());
-  let stderr = "";
-  child.stderr.on("data", (c) => (stderr += c));
-  const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();
-  let id = 0;
-  const call = async (method, params) => {
-    child.stdin.write(`${JSON.stringify({ id: ++id, method, params })}\n`);
-    return JSON.parse((await lines.next()).value);
-  };
+  const backend = startBackend(HOME);
+  const call = backend.call;
   assert.equal((await call("importCsv", { path: csv })).error, "locked");
   assert.match((await call("importCleanup")).error, /No file to delete/);
   await call("unlock", { password: PW });
@@ -99,6 +83,6 @@ test("app backend: importCsv returns counts only; importCleanup deletes just tha
   assert.ok(fs.existsSync(other), "nothing else is touched");
   assert.match((await call("importCleanup")).error, /No file to delete/);
   assert.equal((await call("items")).result.items.length, 4);
-  child.stdin.end();
-  assert.ok(!stderr.includes("pw-"), "no values on stderr");
+  backend.stop();
+  assert.ok(!backend.stderr().includes("pw-"), "no values on stderr");
 });
