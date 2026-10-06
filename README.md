@@ -22,6 +22,7 @@ A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app tha
 - **Password generator** — 20 characters by default, randomness from libsodium.
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
 - **Remember me** — the derived key, not the password, goes to the system's own secret store: DPAPI on Windows, Keychain on macOS, Secret Service (GNOME Keyring / KWallet) on Linux.
+- **Leak guard** — `kv guard` stops a commit that contains any value from the vault; `kv scan` finds the `.env` and key files scattered on disk.
 - **Scriptable** — `--json` output, exit codes `0` ok · `1` failed · `2` wrong arguments, shell completion.
 
 ## Install
@@ -64,6 +65,22 @@ eval "$(kv env)"                   # or load them into the current shell (pwsh: 
 kv example > .env.example          # names only, for the repo
 kv check                           # which names in .env.example the vault is missing
 ```
+
+## Keep keys out of git
+
+Your vault knows your secrets, so it can see them before they're committed.
+
+```bash
+kv guard install                   # a pre-commit hook in this repository
+git commit                         # stopped if a staged line contains any vault value:
+                                   #   src/config.ts:12  my-app/API_KEY
+kv guard --all                     # sweep every tracked file once
+kv scan ~/code                     # every .env and key file on disk, and which values are already in the vault
+kv scan ~/code --import            # move the ones that aren't into the vault, a project per folder
+kv doctor                          # Node, permissions, backups, remember-me, .kv.json, the hook, stale keys
+```
+
+The hook reports file, line and key name — never the value. It needs "remember me" (a hook has no terminal for the password); without it the hook skips with a warning, or blocks with `kv guard --strict`.
 
 ## Ship to platforms
 

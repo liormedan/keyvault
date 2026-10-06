@@ -24,6 +24,8 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/remember.ts` | "remember me" per platform: DPAPI on Windows (`dpapi.ts`), Keychain / Secret Service elsewhere (`@napi-rs/keyring`, optional native dependency — external to the bundles) |
 | `src/project.ts` | `.kv.json` — find the project from the cwd upwards, suggest a name, write the file (names only) |
 | `src/platforms.ts` | `kv push/pull/diff` through `vercel` / `gh`. Values only on stdin; every argument validated (`SAFE_ARG`) because Windows runs the .cmd shims through a shell. `Runner` is injectable for tests |
+| `src/guard.ts` | `kv guard`: vault values (≥ 8 chars) vs. the lines a commit adds (`git diff --cached -U0`) or every tracked file; the pre-commit hook. Reports names, never values |
+| `src/scan.ts` | `kv scan`: `.env` and key files on disk, matched to the vault by hash; tracked-by-git check |
 | `src/completion.ts` | `kv completion <shell>` scripts — commands and flags only, never vault contents |
 | `src/dpapi.ts` | "remember me": the derived key encrypted with Windows DPAPI via PowerShell (stdin, not argv) |
 | `src/io.ts` | hidden input, stdin, clipboard per platform. Windows copies are private (no history / cloud sync). The 20 s clear runs in a **detached Node** process (a detached PowerShell never starts); only the hash is on its command line |
