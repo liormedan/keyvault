@@ -28,6 +28,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `app/src-tauri/` | Tauri 2 shell: spawns `node backend.mjs` (bundled resource, `KV_BACKEND` override, source fallback in dev) and relays the `kv` command. No crypto |
 | `app/ui/` | the window — HTML/CSS + TypeScript bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`). `app.ts` calls the backend through `kv<M>()` typed by `src/protocol.ts`; `globals.d.ts` types Tauri and `window.I18N`. CSP without inline script |
 | `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
+| `test/e2e/app.e2e.ts` | the real window: starts the built exe with a temporary `KV_HOME` and its own `WEBVIEW2_USER_DATA_FOLDER`, drives WebView2 over CDP (playwright-core). `npm run test:e2e`; also a CI job |
 | `test/` | `node:test` suites (Node type stripping), each with its own temporary vault. `test/fixtures/vault-pre-ts.kv` is a vault written by v0.1 — it must keep opening unchanged. `*.typecheck.ts` are compile-time checks |
 
 ## Build
@@ -36,6 +37,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 npm run build            # scripts/build.mjs (esbuild): dist/cli.js, app/src-tauri/resources/backend.mjs, app/ui/dist/{head,app}.js
 npm run typecheck        # tsc --noEmit (TypeScript 7)
 npm test
+npm run test:e2e         # after app:build — the full window flow in both languages
 npm run app:build        # app/src-tauri/target/release/keyvault.exe
 npm run app:installer    # NSIS installer
 ```

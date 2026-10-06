@@ -24,3 +24,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The real desktop window: build the app, then drive it over WebView2's DevTools protocol
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - run: npm ci
+      - run: npm run app:build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: test/e2e/out/
+          if-no-files-found: ignore

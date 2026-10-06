@@ -13,7 +13,7 @@ const PW = "items test";
 
 test("a vault without items opens and gets an empty items map", async () => {
   const { key, data } = await store.create(PW);
-  delete data.items; // like a vault from before typed items
+  delete (data as Partial<typeof data>).items; // like a vault from before typed items
   store.setEntry(data, "proj", "API", "v");
   await store.save(key, data);
   const opened = await store.unlockWithPassword(PW);
