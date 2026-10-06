@@ -30,9 +30,14 @@ test("the real runner refuses shell metacharacters in arguments (Windows runs pl
 });
 
 test("temp paths pass the check: spaces, drive letters, 8.3 short names", () => {
-  // validation happens before spawning; "nonexistent-tool" then fails with "not installed", not "Refusing"
+  // validation happens before spawning
   for (const ok of [String.raw`C:\Users\RUNNER~1\AppData\Local\Temp\kv-pull-1\vercel.env`, String.raw`C:\Users\a b\x.env`, "/tmp/kv-pull-1/vercel.env"]) {
-    assert.throws(() => runTool("nonexistent-tool-kv-test", ["env", "pull", ok], {}), (e: Error) => !/Refusing/.test(e.message), ok);
+    // a missing tool throws on macOS/Linux and just fails through cmd on Windows — either is fine, refusal is not
+    try {
+      runTool("nonexistent-tool-kv-test", ["env", "pull", ok], {});
+    } catch (e) {
+      assert.doesNotMatch((e as Error).message, /Refusing/, ok);
+    }
   }
 });
 
