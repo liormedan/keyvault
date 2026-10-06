@@ -1,5 +1,9 @@
 # keyvault
 
+[![CI](https://github.com/liormedan/keyvault/actions/workflows/ci.yml/badge.svg)](https://github.com/liormedan/keyvault/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/liormedan/keyvault)](https://github.com/liormedan/keyvault/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A local, encrypted vault for the keys and passwords a developer collects: API keys per project, logins, cards, bank details, IDs, Wi-Fi, servers, licenses and secure notes.
 One encrypted file on your machine, a Windows desktop app, and a `kv` command line. Nothing leaves the computer.
 
@@ -19,6 +23,10 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 - **Remember me (Windows)** — the derived key, not the password, is stored with DPAPI so only your Windows user can unlock without typing.
 
 ## Install
+
+**Download:** the installer is attached to each [release](https://github.com/liormedan/keyvault/releases/latest) (`keyvault_x.y.z_x64-setup.exe`). It installs for the current user only and needs [Node.js](https://nodejs.org/) 22.6+ on the machine.
+
+**From source:**
 
 Requirements: Windows 10/11 and [Node.js](https://nodejs.org/) 22.6 or newer.
 
