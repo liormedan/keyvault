@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 2026-10-06
+
+### Changed
+
+- **Renamed to kv-vault** (repository and npm package). The command is still `kv`, and the vault stays in `~/.keyvault`, so nothing to migrate.
+
+### Security
+
+- **Copied secrets no longer land in Windows clipboard history (Win+V) or cloud clipboard sync.** Copies are marked private with the `ExcludeClipboardContentFromMonitorProcessing` / `CanIncludeInClipboardHistory` / `CanUploadToCloudClipboard` formats; before, a copied value outlived the 20-second clear in the history.
+- **The vault locks when Windows locks** — Win+L, sign-out, or waking from sleep to the lock screen. The window clears its list and returns to the unlock screen.
+- CodeQL (security-extended) on every PR and weekly; Dependabot for npm, Cargo and GitHub Actions.
+
 ## 0.2.0 — 2026-10-06
 
 ### Added

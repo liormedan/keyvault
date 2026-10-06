@@ -4,7 +4,7 @@
 import type { Label, Lang } from "../../src/model.ts";
 
 const EN = {
-  "app.title": "Key vault",
+  "app.title": "kv-vault",
   "setup.title": "New vault",
   "setup.lead": "Choose a master password.",
   "setup.warn": "It cannot be recovered if you forget it.",

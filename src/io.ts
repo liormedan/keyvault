@@ -40,13 +40,21 @@ export async function readStdin(): Promise<string> {
 
 const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
 
+// Windows: put text on the clipboard marked as private. Clipboard history (Win+V) and cloud clipboard
+// sync skip content that carries these formats — without them, a copied secret outlives the 20-second clear.
+// https://learn.microsoft.com/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats
+export const WIN_PRIVATE_COPY =
+  "[Console]::InputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; " +
+  "$d = New-Object System.Windows.Forms.DataObject; $d.SetText([Console]::In.ReadToEnd(), 'UnicodeText'); " +
+  "$z = { ,(New-Object System.IO.MemoryStream (,[byte[]](0,0,0,0))) }; " +
+  "$d.SetData('ExcludeClipboardContentFromMonitorProcessing', (& $z)); " +
+  "$d.SetData('CanIncludeInClipboardHistory', (& $z)); " +
+  "$d.SetData('CanUploadToCloudClipboard', (& $z)); " +
+  "[System.Windows.Forms.Clipboard]::SetDataObject($d, $true)";
+
 // Copies to the clipboard and clears it after `seconds` — only if it still holds the same value (compares a hash, not the value).
 export function copyWithClear(value: string, seconds: number = 20): void {
-  execFileSync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", "[Console]::InputEncoding=[Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())"],
-    { input: value, windowsHide: true },
-  );
+  execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
   const script =
     `Start-Sleep -Seconds ${seconds}; $c = Get-Clipboard -Raw; if ($c) { ` +
     `$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c.TrimEnd([char]13,[char]10)))).Replace('-','').ToLower(); ` +

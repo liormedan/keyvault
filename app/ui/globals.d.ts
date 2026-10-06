@@ -15,6 +15,7 @@ declare global {
     };
     __TAURI__: {
       core: { invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> };
+      event: { listen(event: string, handler: () => void): Promise<() => void> };
       dialog: { open(options: { multiple?: boolean; directory?: boolean; filters?: DialogFilter[] }): Promise<string | string[] | null> };
       window: { getCurrentWindow(): { setTheme(theme: "light" | "dark" | null): Promise<void>; setTitle(title: string): Promise<void> } };
     };

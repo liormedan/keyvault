@@ -1,5 +1,5 @@
 // End-to-end test of the real desktop window (Windows only).
-// Starts the built keyvault.exe against a temporary vault and drives its WebView2 over the
+// Starts the built kv-vault.exe against a temporary vault and drives its WebView2 over the
 // DevTools protocol — the same window a user sees, never the real ~/.keyvault.
 //
 //   npm run app:build && npm run test:e2e
@@ -18,7 +18,7 @@ if (process.platform !== "win32") {
 }
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const EXE = process.env.KV_EXE || path.join(ROOT, "app/src-tauri/target/release/keyvault.exe");
+const EXE = process.env.KV_EXE || path.join(ROOT, "app/src-tauri/target/release/kv-vault.exe");
 if (!fs.existsSync(EXE)) throw new Error(`${EXE} not found — run npm run app:build first`);
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), "kv-e2e-"));
 const OUT = path.join(ROOT, "test/e2e/out");
@@ -36,9 +36,9 @@ interface Launched {
   errors: string[];
 }
 
-async function launch(): Promise<Launched> {
+async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> {
   const proc = spawn(EXE, [], {
-    env: { ...process.env, KV_HOME: HOME, WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
+    env: { ...process.env, KV_HOME: HOME, WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`, ...extraEnv },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -273,6 +273,22 @@ await page.click("#forget");
 await page.click("#lock");
 await page.waitForSelector("#unlock:not([hidden])");
 log("forget + lock");
+await a.browser.close().catch(() => {});
+a.proc.kill();
+await sleep(1500);
+
+// ── Locking Windows locks the vault (simulated: the shell runs the same path after 9s) ──
+a = await launch({ KV_SIMULATE_LOCK_AFTER_MS: "9000" });
+page = a.page;
+await page.waitForSelector("#unlock:not([hidden])");
+await page.fill("#unlockForm [name=pw]", PW);
+await page.click("#unlockForm button[type=submit]");
+await page.waitForSelector("#main:not([hidden])", { timeout: 15000 });
+await page.waitForSelector("#unlock:not([hidden])", { timeout: 20000 });
+if ((await page.locator("#list > *").count()) !== 0) throw new Error("list still rendered after the session lock");
+const afterLock = await page.evaluate(() => (window as unknown as { __TAURI__: { core: { invoke(c: string, a: unknown): Promise<{ unlocked: boolean }> } } }).__TAURI__.core.invoke("kv", { method: "status" }));
+if (afterLock.unlocked) throw new Error("backend still unlocked after the session lock");
+log("workstation lock → vault locked, list cleared");
 await a.browser.close().catch(() => {});
 a.proc.kill();
 await sleep(1000);

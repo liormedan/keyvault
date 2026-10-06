@@ -1,12 +1,12 @@
 {
-  "name": "keyvault",
-  "version": "0.2.0",
+  "name": "kv-vault",
+  "version": "0.2.1",
   "description": "A local, encrypted vault for developer keys and passwords — one file, a Tauri desktop app and a CLI. libsodium only.",
   "license": "MIT",
   "author": "Lior Medan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liormedan/keyvault.git"
+    "url": "git+https://github.com/liormedan/kv-vault.git"
   },
   "keywords": [
     "vault",
@@ -50,5 +50,9 @@
     "dist",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "homepage": "https://github.com/liormedan/kv-vault#readme",
+  "bugs": {
+    "url": "https://github.com/liormedan/kv-vault/issues"
+  }
 }
