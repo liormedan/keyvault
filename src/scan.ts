@@ -10,7 +10,7 @@ import type { VaultData } from "./model.ts";
 const SKIP = new Set(["node_modules", ".git", "target", "dist", "build", "out", ".next", ".nuxt", ".svelte-kit", ".turbo", ".vercel", ".venv", "venv", "site-packages", "__pycache__", ".cache", ".gradle", "Pods", "DerivedData", ".pnpm-store", "AppData", "Library", ".Trash", "$RECYCLE.BIN", "System Volume Information"]);
 const SECRETISH = /KEY|SECRET|TOKEN|PASS|PWD|PRIVATE|CREDENTIAL|AUTH|DSN|DATABASE_URL|_URI$|WEBHOOK|SID|SMTP/i;
 const PLACEHOLDER = /^(|your[_-].*|<.*>|x{3,}|\*{3,}|changeme|todo|placeholder|example.*|\.\.\.|null|undefined|true|false|\d{1,5})$/i;
-const TEMPLATE = /example|sample|template|defaults|\.dist$/i;
+const isTemplate = (n: string) => /example|sample|template|defaults/i.test(n) || /\.dist$/i.test(n);
 const isEnvName = (n: string) => /^\.env(\..+)?$/i.test(n) || /\.env$/i.test(n) || /^\.dev\.vars$/i.test(n);
 const CRED: [RegExp, string][] = [
   [/^id_(rsa|ed25519|ecdsa|dsa)$/i, "ssh-private-key"],
@@ -49,6 +49,25 @@ export function parseEnvText(text: string): Record<string, string> {
     out[m[1]!] = v.replace(/\s+#.*$/, "");
   }
   return out;
+}
+
+/** A regular file's text, read through one handle (size checked on that same handle — no check-then-read race); null if too big or not a file */
+export function readSmallFile(p: string, maxBytes: number): string | null {
+  const fd = fs.openSync(p, "r");
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile() || st.size > maxBytes) return null;
+    const buf = Buffer.alloc(st.size);
+    let read = 0;
+    while (read < st.size) {
+      const n = fs.readSync(fd, buf, read, st.size - read, read);
+      if (n === 0) break;
+      read += n;
+    }
+    return buf.subarray(0, read).toString("utf8");
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
@@ -108,20 +127,20 @@ export function scan(root: string, data: VaultData | null, maxDepth = 8): FileFi
       }
       if (!e.isFile()) continue;
       if (isEnvName(e.name)) {
-        let text: string;
+        let text: string | null;
         try {
-          if (fs.statSync(p).size > 512 << 10) continue;
-          text = fs.readFileSync(p, "utf8");
+          text = readSmallFile(p, 512 << 10);
         } catch {
           continue;
         }
+        if (text === null) continue;
         const vars = Object.entries(parseEnvText(text)).map(([name, v]) => {
           const filled = !PLACEHOLDER.test(v);
           // only real-looking values: "8080" in the vault and in a file is a coincidence, not a key
           const where = filled ? index.get(sha(v)) : undefined;
           return { name, filled, secret: SECRETISH.test(name), ...(where ? { inVault: where } : {}) };
         });
-        out.push({ file: p, kind: TEMPLATE.test(e.name) ? "template" : "env", tracked: isTracked(p), vars });
+        out.push({ file: p, kind: isTemplate(e.name) ? "template" : "env", tracked: isTracked(p), vars });
       } else {
         const hit = CRED.find(([re]) => re.test(e.name));
         if (!hit) continue;

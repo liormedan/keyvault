@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { t } from "./i18n.ts";
 import type { VaultData } from "./model.ts";
+import { readSmallFile } from "./scan.ts";
 import { TYPES } from "./types.ts";
 
 /** Shorter values ("true", "8080", "dev") would match everywhere — they can't be secrets worth guarding */
@@ -71,14 +72,13 @@ export function trackedLines(cwd?: string) {
   const out: { file: string; line: number; text: string }[] = [];
   for (const f of git(["ls-files", "-z"], root).split("\0").filter(Boolean)) {
     const p = path.join(root, f);
-    let text: string;
+    let text: string | null;
     try {
-      const st = fs.statSync(p);
-      if (!st.isFile() || st.size > 2 << 20) continue;
-      text = fs.readFileSync(p, "utf8");
+      text = readSmallFile(p, 2 << 20);
     } catch {
       continue;
     }
+    if (text === null) continue;
     if (text.includes("\0")) continue; // binary
     text.split(/\r?\n/).forEach((line, i) => out.push({ file: f, line: i + 1, text: line }));
   }
@@ -97,9 +97,26 @@ function hookPath(cwd?: string): string {
 
 export function installHook(cwd?: string, force = false): string {
   const p = hookPath(cwd);
-  if (fs.existsSync(p) && !fs.readFileSync(p, "utf8").includes(MARK) && !force) throw new Error(t("guard.hookExists", { path: p }));
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, HOOK, { mode: 0o755 });
+  // one handle from check to write: create if absent ("wx"), else open, read and overwrite the same file
+  let fd: number;
+  try {
+    fd = fs.openSync(p, "wx", 0o755);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    fd = fs.openSync(p, "r+");
+    const current = fs.readFileSync(fd, "utf8");
+    if (!current.includes(MARK) && !force) {
+      fs.closeSync(fd);
+      throw new Error(t("guard.hookExists", { path: p }));
+    }
+    fs.ftruncateSync(fd, 0);
+  }
+  try {
+    fs.writeSync(fd, HOOK, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
   return p;
 }
 
