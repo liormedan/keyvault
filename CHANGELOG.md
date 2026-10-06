@@ -12,6 +12,10 @@
 - **The vault locks when Windows locks** — Win+L, sign-out, or waking from sleep to the lock screen. The window clears its list and returns to the unlock screen.
 - CodeQL (security-extended) on every PR and weekly; Dependabot for npm, Cargo and GitHub Actions.
 
+### Fixed
+
+- **The clipboard was never cleared after 20 seconds on Windows** — since 0.1. The clear ran in a detached PowerShell, which never starts on Windows. It now runs in a detached Node process, and a Windows CI test copies, checks the private formats and waits for the clear on a real clipboard.
+
 ## 0.2.0 — 2026-10-06
 
 ### Added
