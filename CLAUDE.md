@@ -35,7 +35,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `app/ui/` | the window — HTML/CSS + TypeScript bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`). `app.ts` calls the backend through `kv<M>()` typed by `src/protocol.ts`; `globals.d.ts` types Tauri and `window.I18N`. CSP without inline script |
 | `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
 | `app/src-tauri/tauri.e2e.conf.json` | merged over tauri.conf.json by `npm run app:build:e2e`: the window opens WebView2's DevTools port for the CI window test. **Never for releases.** Tauri rejects unknown keys (no `$comment`) |
-| `test/e2e/app.e2e.ts` | the real window: starts the built exe with a temporary `KV_HOME` and its own `WEBVIEW2_USER_DATA_FOLDER`, drives WebView2 over CDP (playwright-core). `npm run test:e2e` — local only: on GitHub's hosted Windows runner the app starts but WebView2 never opens the debug port (tried 06.10.2026) |
+| `test/e2e/app.e2e.ts` | the real window: starts the built exe with a temporary `KV_HOME` and its own `WEBVIEW2_USER_DATA_FOLDER`, drives WebView2 over CDP (playwright-core). `npm run test:e2e` after `npm run app:build:e2e`; runs in CI (the `e2e` job). `KV_BACKEND_LOG` collects the backend's stderr when the first screen never shows |
 | `test/` | `node:test` suites (Node type stripping), each with its own temporary vault. `test/fixtures/vault-pre-ts.kv` is a vault written by v0.1 — it must keep opening unchanged. `*.typecheck.ts` are compile-time checks |
 
 ## Build
