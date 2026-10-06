@@ -39,14 +39,24 @@ interface Launched {
 async function launch(): Promise<Launched> {
   const proc = spawn(EXE, [], {
     env: { ...process.env, KV_HOME: HOME, WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  let output = "";
+  proc.stdout?.on("data", (d: Buffer) => (output += d));
+  proc.stderr?.on("data", (d: Buffer) => (output += d));
+  let exited: number | null | undefined;
+  proc.on("exit", (code) => (exited = code));
+  // The first start on a fresh machine (CI) can take a while: WebView2 creates its profile
   let browser: Browser | null = null;
-  for (let i = 0; i < 40 && !browser; i++) {
+  let lastError = "";
+  for (let i = 0; i < 120 && !browser && exited === undefined; i++) {
     await sleep(500);
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`).catch(() => null);
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`).catch((e: Error) => ((lastError = e.message.split(String.fromCharCode(10))[0] ?? ""), null));
   }
-  if (!browser) throw new Error("no CDP");
+  if (!browser) {
+    proc.kill();
+    throw new Error(`no DevTools connection to the app (${exited !== undefined ? `exited with ${exited}` : "still running after 60s"}). Last error: ${lastError}. App output: ${output.slice(-2000) || "(none)"}`);
+  }
   let page: Page | undefined;
   for (let i = 0; i < 20 && !page; i++) { page = browser.contexts()[0]?.pages()[0]; if (!page) await sleep(250); }
   if (!page) throw new Error("no page");
