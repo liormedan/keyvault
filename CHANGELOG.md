@@ -13,7 +13,7 @@
 ### Changed
 
 - **Biome** for lint and format, in CI. Lint findings were fixed in the code rather than switched off.
-- **Coverage** in CI (Ubuntu) with a threshold of 80% of lines, summarized on each run.
+- **Coverage** in CI (Ubuntu) with a threshold of 75% of lines (measured on Linux, where Windows-only code paths are not run), summarized on each run.
 - The window test runs in CI again, against a test-only build whose window config opens the DevTools port (`tauri.e2e.conf.json` — never used for releases).
 
 ### Fixed

@@ -44,7 +44,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 npm run build            # scripts/build.mjs (esbuild): dist/cli.js, app/src-tauri/resources/backend.mjs, app/ui/dist/{head,app}.js
 npm run typecheck        # tsc --noEmit (TypeScript 7)
 npm run lint             # Biome (biome.json); npm run format to fix
-npm run test:coverage    # coverage threshold, lines ≥ 80%
+npm run test:coverage    # coverage threshold, lines ≥ 75% (CI measures on Linux, where Windows-only code does not run)
 npm run release -- x.y.z # version in package.json, tauri.conf.json, Cargo.toml/.lock; dates CHANGELOG
 npm test
 npm run test:e2e         # after app:build — the full window flow in both languages

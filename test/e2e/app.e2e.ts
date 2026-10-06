@@ -86,7 +86,25 @@ const visible = (page: Page, sel: string) => page.locator(sel).isVisible();
 
 let a = await launch();
 let { page } = a;
-await page.waitForSelector("#setup:not([hidden])");
+await page.waitForSelector("#setup:not([hidden])").catch(async (e: Error) => {
+  // the window is up but the first screen isn't: say why (backend status, console, page text)
+  await shot(page, "failure-start").catch(() => {});
+  const status = await page
+    .evaluate(async () => {
+      try {
+        return await (window as unknown as { __TAURI__: { core: { invoke(c: string, a: unknown): Promise<unknown> } } }).__TAURI__.core.invoke("kv", {
+          method: "status",
+        });
+      } catch (err) {
+        return `invoke failed: ${String(err)}`;
+      }
+    })
+    .catch((err: Error) => `evaluate failed: ${err.message}`);
+  const body = ((await page.textContent("body").catch(() => "")) ?? "").replace(/\s+/g, " ").slice(0, 300);
+  throw new Error(
+    `setup screen never showed (${e.message.split(String.fromCharCode(10))[0]}). status: ${JSON.stringify(status)} · console: ${a.errors.join(" | ") || "(none)"} · body: ${body}`,
+  );
+});
 log("setup screen shown");
 const langState = () =>
   page.evaluate(() => ({

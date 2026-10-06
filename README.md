@@ -152,7 +152,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 npm run build         # esbuild: dist/cli.js, the bundled backend, app/ui/dist/
 npm run typecheck     # tsc --noEmit
 npm run lint          # Biome
-npm run test:coverage # the suite with a coverage threshold (lines ≥ 80%)
+npm run test:coverage # the suite with a coverage threshold (lines ≥ 75%)
 npm test              # node:test suites against temporary vaults — never touches ~/.keyvault
 npm run test:e2e      # the real desktop window on a temporary vault (local Windows, after app:build)
 npm run app:build     # desktop app without the installer
