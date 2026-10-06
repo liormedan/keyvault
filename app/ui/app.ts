@@ -198,7 +198,9 @@ function devRow(p: string, e: DevEntryRow): HTMLElement {
     await load();
   }) });
   return el("div", { className: "row" },
-    el("div", {}, el("div", { className: "name", textContent: e.key }), el("div", { className: "note", textContent: e.note || "" })),
+    el("div", {},
+      el("div", { className: "name", textContent: e.key }, ...(e.envs ?? []).map((n) => el("span", { className: "env-tag", textContent: n, title: tr("dev.envTag") }))),
+      el("div", { className: "note", textContent: e.note || "" })),
     shown,
     el("div", { className: "actions" }, reveal, copy, edit, del));
 }

@@ -93,3 +93,4 @@ code { font-family: ui-monospace, Consolas, monospace; background:var(--bg); pad
 #confirmText { margin:0; }
 .gate-links { display:flex; justify-content:center; gap:16px; }
 :root[dir="ltr"] .name { text-align:left; }
+.env-tag { font-family: system-ui, sans-serif; font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:0 7px; margin-inline-start:6px; }

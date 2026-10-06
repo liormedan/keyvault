@@ -9,11 +9,16 @@ import { getLang } from "./i18n.ts";
 import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { readLoginsFile } from "./import-csv.ts";
+import { findProject, suggestName, writeProject } from "./project.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
 import * as store from "./store.ts";
 
-const args = process.argv.slice(2);
-const cmd = args.shift();
+const argv = process.argv.slice(2);
+const cmd = argv.shift();
+// kv's own arguments stop at "--": everything after belongs to the command `kv run` starts
+const dashdash = argv.indexOf("--");
+const args = dashdash >= 0 ? argv.slice(0, dashdash) : argv;
+const passthrough = dashdash >= 0 ? argv.slice(dashdash + 1) : [];
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(name);
   if (i < 0) return undefined;
@@ -27,6 +32,18 @@ const has = (name: string): boolean => {
   args.splice(i, 1);
   return true;
 };
+/** The project named on the command line, else the one in .kv.json; and the environment (--env, else .kv.json) */
+function resolveProject(): { project: string; env?: string } {
+  const env = flag("--env"); // flags first: `kv env --env prod` must not read "--env" as the project
+  const named = args.find((a) => !a.startsWith("--"));
+  if (named) args.splice(args.indexOf(named), 1);
+  if (named) return { project: named, ...(env ? { env } : {}) };
+  const found = findProject();
+  if (!found) throw new UsageError(t("project.none"));
+  const e = env ?? found.env;
+  return { project: found.project, ...(e ? { env: e } : {}) };
+}
+
 /** Wrong arguments: exit code 2 (other failures exit 1) */
 class UsageError extends Error {}
 const json = () => has("--json");
@@ -64,6 +81,24 @@ function parseEnv(text: string): Record<string, string> {
   return out;
 }
 
+/** Values in a shell's syntax, for eval or a pipe. Single quotes: nothing in a value is interpreted. */
+function formatEnv(values: Record<string, string>, format: string): string {
+  const entries = Object.entries(values).sort(([a], [b]) => a.localeCompare(b));
+  const lines = (f: (k: string, v: string) => string) => entries.map(([k, v]) => f(k, v)).join("\n") + "\n";
+  switch (format) {
+    case "json":
+      return `${JSON.stringify(Object.fromEntries(entries), null, 2)}\n`;
+    case "pwsh":
+      return lines((k, v) => `$env:${k} = '${v.replace(/'/g, "''")}'`);
+    case "fish":
+      return lines((k, v) => `set -gx ${k} '${v.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
+    case "dotenv":
+      return lines((k, v) => `${k}=${JSON.stringify(v)}`);
+    default:
+      return lines((k, v) => `export ${k}='${v.replace(/'/g, "'\\''")}'`);
+  }
+}
+
 const commands: Record<string, () => Promise<void>> = {
   async init() {
     const pw = await newPassword();
@@ -73,29 +108,33 @@ const commands: Record<string, () => Promise<void>> = {
   },
 
   async set() {
-    const [p, k] = store.parseRef(args.shift());
     const note = flag("--note");
+    const env = flag("--env");
+    const [p, k] = store.parseRef(args.shift());
     const { key, data } = await unlock();
-    const value = process.stdin.isTTY ? await readHidden(t("cli.prompt.value", { ref: `${p}/${k}` })) : await readStdin();
+    const value = process.stdin.isTTY ? await readHidden(t("cli.prompt.value", { ref: `${p}/${k}${env ? ` (${env})` : ""}` })) : await readStdin();
     if (!value) throw new Error(t("cli.valueEmpty"));
-    store.setEntry(data, p, k, value, note);
+    store.setEntry(data, p, k, value, note, env);
     await store.save(key, data);
     err(t("cli.saved", { ref: `${p}/${k}` }));
   },
 
   async get() {
+    const env = flag("--env");
+    const show = has("--show");
     const [p, k] = store.parseRef(args.shift());
-    if (process.stdout.isTTY && !has("--show")) {
+    if (process.stdout.isTTY && !show) {
       throw new Error(t("cli.noShow"));
     }
     const { data } = await unlock();
-    process.stdout.write(store.getEntry(data, p, k).value);
+    process.stdout.write(store.entryValue(data, p, k, env));
   },
 
   async copy() {
+    const env = flag("--env");
     const [p, k] = store.parseRef(args.shift());
     const { data } = await unlock();
-    copyWithClear(store.getEntry(data, p, k).value, 20);
+    copyWithClear(store.entryValue(data, p, k, env), 20);
     err(t("cli.copied", { ref: `${p}/${k}` }));
   },
 
@@ -121,23 +160,20 @@ const commands: Record<string, () => Promise<void>> = {
   },
 
   async rm() {
+    const env = flag("--env");
     const [p, k] = store.parseRef(args.shift());
     const { key, data } = await unlock();
-    store.deleteEntry(data, p, k);
+    store.deleteEntry(data, p, k, env);
     await store.save(key, data);
     err(t("cli.deleted", { ref: `${p}/${k}` }));
   },
 
   async run() {
-    const p = args.shift();
-    const sep = args.indexOf("--");
-    const command = sep >= 0 ? args.slice(sep + 1) : args;
-    if (!p || !command.length) throw new UsageError(t("cli.usage.run"));
+    const command = passthrough;
+    if (!command.length) throw new UsageError(t("cli.usage.run"));
+    const { project, env: environment } = resolveProject();
     const { data } = await unlock();
-    const keys = data.projects[p];
-    if (!keys) throw new Error(t("cli.noProject", { name: p }));
-    const env: NodeJS.ProcessEnv = { ...process.env };
-    for (const [k, e] of Object.entries(keys)) env[k] = e.value;
+    const env: NodeJS.ProcessEnv = { ...process.env, ...store.projectValues(data, project, environment) };
     // On Windows a shell is needed to run pnpm.cmd / vercel.cmd, so pass one string, quoting arguments that contain spaces
     const win = process.platform === "win32";
     const q = (a: string) => (/[\s"&|<>^()]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
@@ -224,6 +260,54 @@ const commands: Record<string, () => Promise<void>> = {
     if (!l) throw new UsageError(t("cli.usage.lang"));
     saveLang(l);
     err(t("cli.langSet"));
+  },
+
+  async env() {
+    const format = flag("--format") ?? (process.platform === "win32" && !process.env.SHELL ? "pwsh" : "sh");
+    if (!["sh", "pwsh", "fish", "dotenv", "json"].includes(format)) throw new UsageError(t("cli.usage.format", { format }));
+    if (process.stdout.isTTY && !has("--show")) throw new Error(t("cli.envNoTty"));
+    const { project, env } = resolveProject();
+    const { data } = await unlock();
+    process.stdout.write(formatEnv(store.projectValues(data, project, env), format));
+  },
+
+  async "init-project"() {
+    const force = has("--force");
+    const env = flag("--env");
+    const name = args.find((a) => !a.startsWith("--")) ?? suggestName();
+    if (name.includes("/")) throw new UsageError(t("ref.invalid", { ref: name }));
+    const file = writeProject(process.cwd(), { project: name, ...(env ? { env } : {}) }, force);
+    err(t("cli.projectCreated", { path: file, name }));
+  },
+
+  async example() {
+    const { project } = resolveProject();
+    const { data } = await unlock();
+    const keys = data.projects[project];
+    if (!keys) throw new Error(t("cli.noProject", { name: project }));
+    process.stdout.write(Object.keys(keys).sort().map((k) => `${k}=`).join("\n") + "\n");
+  },
+
+  async check() {
+    const file = flag("--file") ?? ".env.example"; // before resolveProject, so its value is not taken as the project
+    const { project, env } = resolveProject();
+    const wanted = Object.keys(parseEnv(fs.readFileSync(file, "utf8")));
+    const { data } = await unlock();
+    const have = store.projectValues(data, project, env);
+    const missing = wanted.filter((k) => !(k in have));
+    if (missing.length) throw new Error(t("cli.checkMissing", { project, env: env ? `, ${env}` : "", names: missing.join(", ") }));
+    err(t("cli.checkOk", { n: wanted.length, file, project }));
+  },
+
+  async mv() {
+    const from = args.shift();
+    const to = args.shift();
+    if (!from || !to) throw new UsageError(t("cli.usage.mv"));
+    const { key, data } = await unlock();
+    if (from.includes("/") || to.includes("/")) store.renameEntry(data, store.parseRef(from), store.parseRef(to));
+    else store.renameProject(data, from, to);
+    await store.save(key, data);
+    err(t("cli.moved", { from, to }));
   },
 
   async status() {
