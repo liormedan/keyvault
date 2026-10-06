@@ -16,10 +16,13 @@ test("a vault from before the TypeScript migration opens with the same contents"
   const { data } = await store.unlockWithPassword(PW);
   assert.equal(store.getEntry(data, "demo-app", "API_KEY").value, "fixture-api-value");
   const items = store.listItems(data);
-  assert.deepEqual(items.map((i) => [i.type, i.title, i.sub]), [
-    ["login", "Example", "dana@example.com · example.com"],
-    ["card", "Test card", "•••• 1111 · 12/30"],
-  ]);
+  assert.deepEqual(
+    items.map((i) => [i.type, i.title, i.sub]),
+    [
+      ["login", "Example", "dana@example.com · example.com"],
+      ["card", "Test card", "•••• 1111 · 12/30"],
+    ],
+  );
   const login = items.find((i) => i.type === "login")!;
   assert.equal(store.itemValue(data, login.id, "password"), "fixture-login-pw");
 });

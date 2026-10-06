@@ -8,7 +8,13 @@ A local, encrypted vault for a developer's API keys — one file, no account, no
 `kv run -- npm run dev` injects a project's keys as environment variables, so there's no `.env` file to leak.
 A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app that also keeps logins, cards and notes.
 
+![kv-vault in a terminal](docs/demo.svg)
+
+<details><summary>The desktop app (Windows)</summary>
+
 ![kv-vault desktop app](docs/screenshot.png)
+
+</details>
 
 > The interface is in English by default, with Hebrew (right-to-left) one click away — the language button in the app, or `kv lang he` for the command line.
 
@@ -95,6 +101,8 @@ kv drives the platforms' own CLIs (`vercel`, `gh`), so it uses the login you alr
 
 ## Command line
 
+The full reference — every flag, exit code and `--json` shape — is in [docs/CLI.md](docs/CLI.md).
+
 ```bash
 kv init                                   # create a vault (master password, no recovery if forgotten)
 kv unlock --remember                      # remember on this Windows user, so commands don't ask
@@ -138,9 +146,13 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vault [file format](docs/FORMAT.md) — enough to write your own reader.
+
 ```bash
 npm run build         # esbuild: dist/cli.js, the bundled backend, app/ui/dist/
 npm run typecheck     # tsc --noEmit
+npm run lint          # Biome
+npm run test:coverage # the suite with a coverage threshold (lines ≥ 80%)
 npm test              # node:test suites against temporary vaults — never touches ~/.keyvault
 npm run test:e2e      # the real desktop window on a temporary vault (local Windows, after app:build)
 npm run app:build     # desktop app without the installer

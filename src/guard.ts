@@ -80,7 +80,8 @@ export function trackedLines(cwd?: string) {
     }
     if (text === null) continue;
     if (text.includes("\0")) continue; // binary
-    text.split(/\r?\n/).forEach((line, i) => out.push({ file: f, line: i + 1, text: line }));
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) out.push({ file: f, line: i + 1, text: lines[i]! });
   }
   return out;
 }

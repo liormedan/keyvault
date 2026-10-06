@@ -1,0 +1,36 @@
+name: Bug
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "**Never paste a key, password or vault file here.** Security problems: use *Security → Report a vulnerability* instead."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "kv init-project\nkv run -- npm run dev\n…"
+  - type: input
+    id: version
+    attributes:
+      label: kv --version
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [Windows, macOS, Linux]
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `kv doctor`
+      render: text

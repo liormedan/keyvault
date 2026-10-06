@@ -23,8 +23,37 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
         env:
           KV_TEST_CLIPBOARD: ${{ matrix.os != 'ubuntu-latest' && '1' || '' }}
           KV_TEST_KEYCHAIN: ${{ matrix.os == 'macos-latest' && '1' || '' }}
       - run: npm run build
+      - name: Coverage (lines ≥ 80%)
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run test:coverage | tee coverage.txt && { echo '```'; grep -E '^# (file|all files| )' coverage.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+  # The real desktop window. A test-only build opens WebView2's DevTools port from the window config
+  # (tauri.e2e.conf.json) — the environment variable alone is ignored on hosted runners.
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - run: npm ci
+      - run: npm run app:build:e2e
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: test/e2e/out/
+          if-no-files-found: ignore

@@ -18,17 +18,27 @@ export function parseCsv(text: string): string[][] {
     const c = s[i];
     if (quoted) {
       if (c === '"') {
-        if (s[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+        if (s[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else quoted = false;
       } else field += c;
     } else if (c === '"') quoted = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n" || c === "\r") {
+    else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n" || c === "\r") {
       if (c === "\r" && s[i + 1] === "\n") i++;
-      row.push(field); field = "";
-      rows.push(row); row = [];
+      row.push(field);
+      field = "";
+      rows.push(row);
+      row = [];
     } else field += c;
   }
-  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  if (field !== "" || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows.filter((r) => r.some((v) => v !== ""));
 }
 
@@ -66,7 +76,10 @@ export function csvToLogins(text: string): { logins: ImportedLogin[]; skipped: n
   for (const r of rows.slice(1)) {
     const get = (f: Column) => (col[f] >= 0 ? (r[col[f]] ?? "") : "");
     const password = get("password");
-    if (!password) { skipped++; continue; }
+    if (!password) {
+      skipped++;
+      continue;
+    }
     const url = get("url").trim();
     logins.push({
       title: get("title").trim() || hostOf(url) || t("import.untitled"),

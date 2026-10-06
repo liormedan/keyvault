@@ -28,7 +28,11 @@ const FIREFOX = [
 
 test("csv parser: quotes, escaped quotes, commas and newlines inside fields, BOM", () => {
   const rows = parseCsv(`﻿a,b\r\n"x,1","he said ""hi"""\r\n"multi\nline",z\r\n`);
-  assert.deepEqual(rows, [["a", "b"], ["x,1", 'he said "hi"'], ["multi\nline", "z"]]);
+  assert.deepEqual(rows, [
+    ["a", "b"],
+    ["x,1", 'he said "hi"'],
+    ["multi\nline", "z"],
+  ]);
 });
 
 test("chrome export: columns by name, rows without a password skipped", () => {
@@ -43,7 +47,10 @@ test("chrome export: columns by name, rows without a password skipped", () => {
 
 test("firefox export: no name column — title falls back to the host", () => {
   const { logins } = csvToLogins(FIREFOX);
-  assert.deepEqual(logins.map((l) => l.title), ["example.com", "forum.example"]);
+  assert.deepEqual(
+    logins.map((l) => l.title),
+    ["example.com", "forum.example"],
+  );
 });
 
 test("a file that is not a password export is rejected", () => {

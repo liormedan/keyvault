@@ -7,7 +7,33 @@ import fs from "node:fs";
 import path from "node:path";
 import type { VaultData } from "./model.ts";
 
-const SKIP = new Set(["node_modules", ".git", "target", "dist", "build", "out", ".next", ".nuxt", ".svelte-kit", ".turbo", ".vercel", ".venv", "venv", "site-packages", "__pycache__", ".cache", ".gradle", "Pods", "DerivedData", ".pnpm-store", "AppData", "Library", ".Trash", "$RECYCLE.BIN", "System Volume Information"]);
+const SKIP = new Set([
+  "node_modules",
+  ".git",
+  "target",
+  "dist",
+  "build",
+  "out",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".vercel",
+  ".venv",
+  "venv",
+  "site-packages",
+  "__pycache__",
+  ".cache",
+  ".gradle",
+  "Pods",
+  "DerivedData",
+  ".pnpm-store",
+  "AppData",
+  "Library",
+  ".Trash",
+  "$RECYCLE.BIN",
+  "System Volume Information",
+]);
 const SECRETISH = /KEY|SECRET|TOKEN|PASS|PWD|PRIVATE|CREDENTIAL|AUTH|DSN|DATABASE_URL|_URI$|WEBHOOK|SID|SMTP/i;
 const PLACEHOLDER = /^(|your[_-].*|<.*>|x{3,}|\*{3,}|changeme|todo|placeholder|example.*|\.\.\.|null|undefined|true|false|\d{1,5})$/i;
 const isTemplate = (n: string) => /example|sample|template|defaults/i.test(n) || /\.dist$/i.test(n);
@@ -90,7 +116,10 @@ function isTracked(file: string): boolean | null {
   let d = path.dirname(file);
   let root: string | null = null;
   for (let i = 0; i < 40; i++) {
-    if (fs.existsSync(path.join(d, ".git"))) { root = d; break; }
+    if (fs.existsSync(path.join(d, ".git"))) {
+      root = d;
+      break;
+    }
     const up = path.dirname(d);
     if (up === d) break;
     d = up;
@@ -99,7 +128,15 @@ function isTracked(file: string): boolean | null {
   if (!trackedCache.has(root)) {
     try {
       const out = execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
-      trackedCache.set(root, new Set(out.split("\0").filter(Boolean).map((p) => path.resolve(root!, p).toLowerCase())));
+      trackedCache.set(
+        root,
+        new Set(
+          out
+            .split("\0")
+            .filter(Boolean)
+            .map((p) => path.resolve(root!, p).toLowerCase()),
+        ),
+      );
     } catch {
       trackedCache.set(root, null);
     }

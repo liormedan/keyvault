@@ -38,7 +38,13 @@ interface Launched {
 
 async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> {
   const proc = spawn(EXE, [], {
-    env: { ...process.env, KV_HOME: HOME, WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`, ...extraEnv },
+    env: {
+      ...process.env,
+      KV_HOME: HOME,
+      WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"),
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
+      ...extraEnv,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -51,14 +57,22 @@ async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> 
   let lastError = "";
   for (let i = 0; i < 120 && !browser && exited === undefined; i++) {
     await sleep(500);
-    browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`).catch((e: Error) => ((lastError = e.message.split(String.fromCharCode(10))[0] ?? ""), null));
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`).catch((e: Error) => {
+      lastError = e.message.split(String.fromCharCode(10))[0] ?? "";
+      return null;
+    });
   }
   if (!browser) {
     proc.kill();
-    throw new Error(`no DevTools connection to the app (${exited !== undefined ? `exited with ${exited}` : "still running after 60s"}). Last error: ${lastError}. App output: ${output.slice(-2000) || "(none)"}`);
+    throw new Error(
+      `no DevTools connection to the app (${exited !== undefined ? `exited with ${exited}` : "still running after 60s"}). Last error: ${lastError}. App output: ${output.slice(-2000) || "(none)"}`,
+    );
   }
   let page: Page | undefined;
-  for (let i = 0; i < 20 && !page; i++) { page = browser.contexts()[0]?.pages()[0]; if (!page) await sleep(250); }
+  for (let i = 0; i < 20 && !page; i++) {
+    page = browser.contexts()[0]?.pages()[0];
+    if (!page) await sleep(250);
+  }
   if (!page) throw new Error("no page");
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -74,7 +88,13 @@ let a = await launch();
 let { page } = a;
 await page.waitForSelector("#setup:not([hidden])");
 log("setup screen shown");
-const langState = () => page.evaluate(() => ({ dir: document.documentElement.dir, title: document.title, h1: document.querySelector("#setup h1")?.textContent, btn: document.querySelector("#setup button[type=submit]")?.textContent }));
+const langState = () =>
+  page.evaluate(() => ({
+    dir: document.documentElement.dir,
+    title: document.title,
+    h1: document.querySelector("#setup h1")?.textContent,
+    btn: document.querySelector("#setup button[type=submit]")?.textContent,
+  }));
 let ls = await langState();
 if (ls.dir !== "ltr" || ls.h1 !== "New vault" || ls.btn !== "Create vault") throw new Error("not English by default: " + JSON.stringify(ls));
 await shot(page, "0-setup-en");
@@ -103,7 +123,10 @@ await page.click("#setupForm button[type=submit]");
 await page.waitForSelector("#main:not([hidden])", { timeout: 15000 });
 log("vault created, main screen");
 
-const addDev = async () => { await page.click("#add"); await page.locator("#pickGrid button", { hasText: "מפתח פיתוח" }).click(); };
+const addDev = async () => {
+  await page.click("#add");
+  await page.locator("#pickGrid button", { hasText: "מפתח פיתוח" }).click();
+};
 await addDev();
 await page.fill("#form [name=p]", "demo-site");
 await page.fill("#form [name=k]", "API_KEY");
@@ -169,12 +192,12 @@ await page.waitForFunction(() => document.querySelector("#itemDlg")!.textContent
 log("card: editing keeps secrets, number grouped by 4");
 await dlg.getByRole("button", { name: "סגירה" }).click();
 
-const sub = await page.locator(".item", { hasText: "ויזה" }).locator(".sub").textContent() ?? "";
+const sub = (await page.locator(".item", { hasText: "ויזה" }).locator(".sub").textContent()) ?? "";
 const subBox = (await page.locator(".item", { hasText: "ויזה" }).locator(".sub span").first().boundingBox())!;
 const expBox = (await page.locator(".item", { hasText: "ויזה" }).locator(".sub span").last().boundingBox())!;
 if (!(subBox.x > expBox.x)) throw new Error("card subtitle order is not right-to-left by part");
 if (sub !== "•••• 9012 · 08/29") throw new Error("card subtitle: " + sub);
-if ((await page.locator("#list").textContent() ?? "").includes("321")) throw new Error("cvv in list");
+if (((await page.locator("#list").textContent()) ?? "").includes("321")) throw new Error("cvv in list");
 await page.locator(".item", { hasText: "GitHub" }).locator(".star").click();
 await page.waitForFunction(() => document.querySelector(".item .star[aria-pressed=true]"));
 await page.locator("#cats button", { hasText: "מועדפים" }).click();
@@ -197,18 +220,34 @@ log("item deleted");
 
 // ── Browser import (the file picker is replaced with a fixed path) ──
 const csvPath = path.join(HOME, "Chrome Passwords.csv");
-fs.writeFileSync(csvPath, ["name,url,username,password,note","example.com,https://example.com/login,dana@example.com,csv-secret-1,","\"Shop, Inc.\",https://shop.example,dana,\"csv,secret-2\",note","empty.example,https://empty.example,dana,,",""].join(String.fromCharCode(13, 10)));
-const stubbed = await page.evaluate((p) => { try { window.__TAURI__.dialog.open = async () => p; return window.__TAURI__.dialog.open !== undefined; } catch (e) { return String(e); } }, csvPath);
+fs.writeFileSync(
+  csvPath,
+  [
+    "name,url,username,password,note",
+    "example.com,https://example.com/login,dana@example.com,csv-secret-1,",
+    '"Shop, Inc.",https://shop.example,dana,"csv,secret-2",note',
+    "empty.example,https://empty.example,dana,,",
+    "",
+  ].join(String.fromCharCode(13, 10)),
+);
+const stubbed = await page.evaluate((p) => {
+  try {
+    window.__TAURI__.dialog.open = async () => p;
+    return window.__TAURI__.dialog.open !== undefined;
+  } catch (e) {
+    return String(e);
+  }
+}, csvPath);
 if (stubbed !== true) throw new Error("cannot stub dialog: " + stubbed);
 await page.click("#add");
 await page.locator("#pickGrid button", { hasText: "ייבוא סיסמאות מדפדפן" }).click();
 await shot(page, "9-import");
 await dlg.getByRole("button", { name: "בחירת קובץ CSV" }).click();
 await page.waitForSelector("#importResult");
-const importText = await page.textContent("#importResult") ?? "";
+const importText = (await page.textContent("#importResult")) ?? "";
 if (!importText.includes("נוספו 2") || !importText.includes("1 שורות בלי סיסמה")) throw new Error("import result: " + importText);
 await shot(page, "10-import-done");
-if ((await page.locator("body").textContent() ?? "").includes("csv-secret")) throw new Error("imported password visible in the page");
+if (((await page.locator("body").textContent()) ?? "").includes("csv-secret")) throw new Error("imported password visible in the page");
 await dlg.getByRole("button", { name: "מחיקת הקובץ" }).click();
 await page.waitForFunction(() => !document.querySelector<HTMLDialogElement>("#itemDlg")!.open);
 if (fs.existsSync(csvPath)) throw new Error("csv not deleted");
@@ -253,12 +292,12 @@ if ((await page.evaluate(() => document.documentElement.dir)) !== "rtl") throw n
 await page.locator("header .lang-toggle").click();
 await page.waitForFunction(() => document.querySelector("#add")!.textContent === "Add" && document.documentElement.dir === "ltr");
 await shot(page, "11-main-en");
-const catsEn = await page.locator("#cats").textContent() ?? "";
+const catsEn = (await page.locator("#cats").textContent()) ?? "";
 if (!catsEn.includes("Logins") || !catsEn.includes("Dev keys")) throw new Error("categories not in English: " + catsEn);
 await page.locator(".item .open").first().click();
 const dlg2 = page.locator("#itemDlg");
 await dlg2.locator("dl.fields").waitFor();
-const dlgEn = await dlg2.textContent() ?? "";
+const dlgEn = (await dlg2.textContent()) ?? "";
 if (!dlgEn.includes("Password") || !dlgEn.includes("Close")) throw new Error("item dialog not in English: " + dlgEn.slice(0, 120));
 await shot(page, "12-item-en");
 await dlg2.getByRole("button", { name: "Close" }).click();
@@ -286,7 +325,11 @@ await page.click("#unlockForm button[type=submit]");
 await page.waitForSelector("#main:not([hidden])", { timeout: 15000 });
 await page.waitForSelector("#unlock:not([hidden])", { timeout: 20000 });
 if ((await page.locator("#list > *").count()) !== 0) throw new Error("list still rendered after the session lock");
-const afterLock = await page.evaluate(() => (window as unknown as { __TAURI__: { core: { invoke(c: string, a: unknown): Promise<{ unlocked: boolean }> } } }).__TAURI__.core.invoke("kv", { method: "status" }));
+const afterLock = await page.evaluate(() =>
+  (window as unknown as { __TAURI__: { core: { invoke(c: string, a: unknown): Promise<{ unlocked: boolean }> } } }).__TAURI__.core.invoke("kv", {
+    method: "status",
+  }),
+);
 if (afterLock.unlocked) throw new Error("backend still unlocked after the session lock");
 log("workstation lock → vault locked, list cleared");
 await a.browser.close().catch(() => {});
@@ -294,11 +337,13 @@ a.proc.kill();
 await sleep(1000);
 
 const raw = fs.readFileSync(path.join(HOME, "vault.kv"), "utf8");
-if (raw.includes(SECRET) || raw.includes("API_KEY") || raw.includes(genPw) || raw.includes("GitHub") || raw.includes("csv-secret")) throw new Error("plaintext in vault");
+if (raw.includes(SECRET) || raw.includes("API_KEY") || raw.includes(genPw) || raw.includes("GitHub") || raw.includes("csv-secret"))
+  throw new Error("plaintext in vault");
 if (fs.existsSync(path.join(HOME, "key.dpapi"))) throw new Error("dpapi not forgotten");
 log("vault file encrypted, remembered key removed");
 const consoleErrors = [...errors1, ...a.errors];
 if (consoleErrors.length) throw new Error("console errors: " + consoleErrors.join(" | "));
 log("no console errors");
-await sleep(1500); fs.rmSync(HOME, { recursive: true, force: true, maxRetries: 5 });
+await sleep(1500);
+fs.rmSync(HOME, { recursive: true, force: true, maxRetries: 5 });
 log("OK");

@@ -1,0 +1,64 @@
+# Vault file format (version 1)
+
+A vault is one UTF-8 JSON file, by default `~/.keyvault/vault.kv`. This document is enough to write an independent reader.
+
+## Outer file
+
+```json
+{
+  "v": 1,
+  "kdf": { "alg": "argon2id13", "ops": 3, "mem": 268435456, "salt": "<base64>" },
+  "nonce": "<base64, 24 bytes>",
+  "ct": "<base64>"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `v` | format version — `1` |
+| `kdf.alg` | `argon2id13` — Argon2id, libsodium's `crypto_pwhash_ALG_ARGON2ID13` |
+| `kdf.ops`, `kdf.mem` | opslimit and memlimit (libsodium `MODERATE` when created: 3 and 256 MiB) |
+| `kdf.salt` | 16 bytes, base64 (standard alphabet, padded) |
+| `nonce` | 24 bytes, base64 |
+| `ct` | ciphertext + 16-byte tag, base64 |
+
+## Decryption
+
+1. **Key:** `crypto_pwhash(32, password, salt, ops, mem, ARGON2ID13)` → 32 bytes.
+2. **Additional data:** the UTF-8 bytes of `JSON.stringify({ v, kdf })` — the outer object without `nonce` and `ct`, keys in that order. Changing anything in the header therefore fails decryption.
+3. **Plaintext:** `crypto_aead_xchacha20poly1305_ietf_decrypt(ct, ad, nonce, key)` → UTF-8 JSON (below).
+
+A new random nonce is used for every save.
+
+## Plaintext
+
+```jsonc
+{
+  "created": "2026-10-04T00:09:00.000Z",
+  "projects": {
+    "my-app": {
+      "API_KEY": {
+        "value": "…",                 // default value; "" if the key only has per-environment values
+        "note": "…",
+        "updated": "2026-10-06T…",
+        "envs": {                     // optional (0.4+): per-environment values
+          "prod": { "value": "…", "updated": "…" }
+        }
+      }
+    }
+  },
+  "items": {                          // optional (0.2+): typed items, by id
+    "<uuid>": {
+      "id": "<uuid>", "type": "login", "title": "GitHub",
+      "fields": { "url": "…", "username": "…", "password": "…" },
+      "fav": false, "created": "…", "updated": "…"
+    }
+  }
+}
+```
+
+Item types and their fields are defined in [`src/types.ts`](../src/types.ts). Readers should treat missing `items` and `envs` as empty — vaults from earlier versions don't have them.
+
+## Remember me
+
+Not part of the vault file. The 32-byte derived key is stored by the OS: `~/.keyvault/key.dpapi` on Windows (`{ "salt", "blob" }`, DPAPI `CurrentUser`), or the system keychain (service `kv-vault`, account `vault-<salt>`) with a `key.keychain` marker on macOS and Linux. The salt ties it to one vault: a new vault (or a changed master password) invalidates it.
