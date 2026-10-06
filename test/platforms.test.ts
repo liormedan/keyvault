@@ -29,6 +29,13 @@ test("the real runner refuses shell metacharacters in arguments (Windows runs pl
   }
 });
 
+test("temp paths pass the check: spaces, drive letters, 8.3 short names", () => {
+  // validation happens before spawning; "nonexistent-tool" then fails with "not installed", not "Refusing"
+  for (const ok of [String.raw`C:\Users\RUNNER~1\AppData\Local\Temp\kv-pull-1\vercel.env`, String.raw`C:\Users\a b\x.env`, "/tmp/kv-pull-1/vercel.env"]) {
+    assert.throws(() => runTool("nonexistent-tool-kv-test", ["env", "pull", ok], {}), (e: Error) => !/Refusing/.test(e.message), ok);
+  }
+});
+
 test("vercel target from the kv environment", () => {
   assert.equal(vercelTarget(undefined), "development");
   assert.equal(vercelTarget("prod"), "production");

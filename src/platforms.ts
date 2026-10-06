@@ -22,7 +22,7 @@ export type Runner = (cmd: string, args: string[], opts: { input?: string; cwd?:
 
 const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // names, targets, repo names — and our own temp-file paths (drive letters, backslashes, spaces in a user folder)
-const SAFE_ARG = /^[A-Za-z0-9._\/:\\ ()-]+$/;
+const SAFE_ARG = /^[A-Za-z0-9._\/:\\ ()~-]+$/; // ~ for 8.3 short paths (C:\Users\RUNNER~1\…)
 const WINDOWS = process.platform === "win32";
 
 export const runTool: Runner = (cmd, args, { input, cwd }) => {
