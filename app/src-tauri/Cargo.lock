@@ -1648,13 +1648,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyvault"
-version = "0.2.0"
+name = "kv-vault"
+version = "0.2.1"
 dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

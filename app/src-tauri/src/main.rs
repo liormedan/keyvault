@@ -1,4 +1,4 @@
-// keyvault — desktop app. The window talks to the Node backend over a pipe:
+// kv-vault — desktop app. The window talks to the Node backend over a pipe:
 // one JSON line per request, one per reply. No port, no network. Crypto stays in Node (libsodium).
 // Request and reply contents are never logged.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -8,7 +8,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 struct Backend {
     child: Child,
@@ -101,11 +102,69 @@ async fn kv(app: AppHandle, state: State<'_, AppState>, method: String, params: 
     result
 }
 
+// ── Lock with the workstation ──
+// While Windows is locked (Win+L, sign-out, wake from sleep to the lock screen) the interactive input
+// desktop belongs to Winlogon, so OpenInputDesktop fails. Polling that is simpler and more robust than
+// session notifications, which need a message window. A UAC prompt also counts — locking then is fine.
+#[cfg(windows)]
+fn workstation_locked() -> bool {
+    use windows_sys::Win32::System::StationsAndDesktops::{CloseDesktop, OpenInputDesktop, DESKTOP_SWITCHDESKTOP};
+    unsafe {
+        let desk = OpenInputDesktop(0, 0, DESKTOP_SWITCHDESKTOP);
+        if desk.is_null() {
+            return true;
+        }
+        CloseDesktop(desk);
+        false
+    }
+}
+
+#[cfg(not(windows))]
+fn workstation_locked() -> bool {
+    false
+}
+
+fn lock_vault(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if let Ok(mut guard) = state.0.lock() {
+        if let Some(backend) = guard.as_mut() {
+            let _ = call(backend, "lock", json!({}));
+        }
+    }
+    let _ = app.emit("kv-locked", ());
+}
+
+fn watch_session(app: AppHandle) {
+    // KV_SIMULATE_LOCK_AFTER_MS: tests trigger the same path once, without locking the real screen
+    let simulate_at = std::env::var("KV_SIMULATE_LOCK_AFTER_MS")
+        .ok()
+        .and_then(|ms| ms.parse::<u64>().ok())
+        .map(|ms| Instant::now() + Duration::from_millis(ms));
+    std::thread::spawn(move || {
+        let mut was_locked = false;
+        let mut simulated = false;
+        loop {
+            std::thread::sleep(Duration::from_millis(500));
+            let locked = workstation_locked();
+            let simulate = !simulated && simulate_at.is_some_and(|at| Instant::now() >= at);
+            if (locked && !was_locked) || simulate {
+                simulated |= simulate;
+                lock_vault(&app);
+            }
+            was_locked = locked;
+        }
+    });
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .setup(|app| {
+            watch_session(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![kv])
         .run(tauri::generate_context!())
-        .expect("keyvault: failed to start the window");
+        .expect("kv-vault: failed to start the window");
 }

@@ -1,13 +1,13 @@
-# keyvault
+# kv-vault
 
-[![CI](https://github.com/liormedan/keyvault/actions/workflows/ci.yml/badge.svg)](https://github.com/liormedan/keyvault/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/liormedan/keyvault)](https://github.com/liormedan/keyvault/releases/latest)
+[![CI](https://github.com/liormedan/kv-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/liormedan/kv-vault/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/liormedan/kv-vault)](https://github.com/liormedan/kv-vault/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A local, encrypted vault for the keys and passwords a developer collects: API keys per project, logins, cards, bank details, IDs, Wi-Fi, servers, licenses and secure notes.
 One encrypted file on your machine, a Windows desktop app, and a `kv` command line. Nothing leaves the computer.
 
-![keyvault desktop app](docs/screenshot.png)
+![kv-vault desktop app](docs/screenshot.png)
 
 > The interface is in English by default, with Hebrew (right-to-left) one click away — the language button in the app, or `kv lang he` for the command line.
 
@@ -24,15 +24,15 @@ One encrypted file on your machine, a Windows desktop app, and a `kv` command li
 
 ## Install
 
-**Download:** the installer is attached to each [release](https://github.com/liormedan/keyvault/releases/latest) (`keyvault_x.y.z_x64-setup.exe`). It installs for the current user only and needs [Node.js](https://nodejs.org/) 22.6+ on the machine.
+**Download:** the installer is attached to each [release](https://github.com/liormedan/kv-vault/releases/latest) (`kv-vault_x.y.z_x64-setup.exe`). It installs for the current user only and needs [Node.js](https://nodejs.org/) 22.6+ on the machine.
 
 **From source:**
 
 Requirements: Windows 10/11 and [Node.js](https://nodejs.org/) 22.6 or newer.
 
 ```bash
-git clone https://github.com/liormedan/keyvault.git
-cd keyvault
+git clone https://github.com/liormedan/kv-vault.git
+cd kv-vault
 npm install
 npm link                 # installs the `kv` command
 npm run app:installer    # builds the desktop installer (needs Rust + the Tauri prerequisites)
@@ -59,6 +59,8 @@ kv ui                                     # browser UI on 127.0.0.1 (if you don'
 kv lang <en|he>                           # interface language (also: KV_LANG)
 ```
 
+Data lives in `~/.keyvault/` (the project's original name — kept so existing vaults keep working).
+
 Environment: `KV_LANG` — `en` or `he` (overrides `kv lang`). `KV_HOME` — vault folder (default `~/.keyvault`). `KV_BACKUP_DIR` — default backup folder. `KV_NO_OPEN=1` — `kv ui` doesn't open a browser.
 
 ## Security model
@@ -69,7 +71,7 @@ What it protects against: someone who gets the vault file (a backup, a synced fo
 - The desktop app talks to its backend over a pipe — no port, no network. The browser UI (`kv ui`) listens on 127.0.0.1 only, with a random port and token, Host/Origin checks, and shuts down after 15 idle minutes.
 - Values are never written to logs, error messages or command-line arguments.
 
-Importing from a browser goes through the browser's own export file on purpose: keyvault never reads a browser's password database directly.
+Importing from a browser goes through the browser's own export file on purpose: kv-vault never reads a browser's password database directly.
 
 What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. There is no master-password recovery, no sync and no browser autofill.
 

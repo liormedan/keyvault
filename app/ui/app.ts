@@ -477,14 +477,22 @@ $<HTMLFormElement>("#unlockForm").addEventListener("submit", (ev) => {
 
 $("#add").onclick = () => (cat === DEV ? openDev() : isType(cat) ? void editItem(cat) : pickType());
 $("#q").oninput = render;
-$("#lock").onclick = async () => {
-  await kv("lock").catch(() => {});
+/** Forget everything the window was showing, then go to the unlock screen */
+async function lockedView(): Promise<void> {
   items = [];
   projects = {};
   $("#list").replaceChildren();
   $<HTMLInputElement>("#q").value = "";
   await show();
+}
+
+$("#lock").onclick = async () => {
+  await kv("lock").catch(() => {});
+  await lockedView();
 };
+
+// Windows was locked (or the machine slept): the shell already locked the backend
+void window.__TAURI__.event.listen("kv-locked", () => void lockedView());
 $("#forget").onclick = safe(async () => {
   await kv("forget");
   $("#forget").hidden = true;

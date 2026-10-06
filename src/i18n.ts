@@ -40,7 +40,7 @@ const EN = {
     "cancelled": "Cancelled",
     "lang.invalid": "Unknown language: {lang}. Use: en, he",
 
-    "cli.help": `kv — a local vault for development keys
+    "cli.help": `kv — kv-vault, a local vault for development keys
 
   kv init                          create a new vault (master password)
   kv set  <project/KEY> [--note "..."]   add or update. The value is typed hidden, or piped in
@@ -97,7 +97,7 @@ Vault: {vault}`,
     "ui.closed": "closed",
     "ui.tooBig": "Too large",
     "ui.open": "kv ui: open at {url}\n      Ctrl+C to close. Shuts down by itself after 15 idle minutes.",
-    "web.title": "Key vault",
+    "web.title": "kv-vault",
     "web.search": "Search projects or keys",
     "web.searchLabel": "Search",
     "web.add": "Add key",

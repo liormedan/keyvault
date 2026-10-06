@@ -1,4 +1,4 @@
-# keyvault — notes for coding agents
+# kv-vault — notes for coding agents
 
 Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE.local.md` (gitignored).
 
@@ -38,7 +38,7 @@ npm run build            # scripts/build.mjs (esbuild): dist/cli.js, app/src-tau
 npm run typecheck        # tsc --noEmit (TypeScript 7)
 npm test
 npm run test:e2e         # after app:build — the full window flow in both languages
-npm run app:build        # app/src-tauri/target/release/keyvault.exe
+npm run app:build        # app/src-tauri/target/release/kv-vault.exe
 npm run app:installer    # NSIS installer
 ```
 

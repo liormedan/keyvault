@@ -1,6 +1,6 @@
 [package]
-name = "keyvault"
-version = "0.2.0"
+name = "kv-vault"
+version = "0.2.1"
 description = "Local encrypted vault for developer keys — desktop app"
 edition = "2021"
 license = "MIT"
@@ -12,6 +12,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde_json = "1"
 tauri-plugin-dialog = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_StationsAndDesktops"] }
 
 [profile.release]
 codegen-units = 1
