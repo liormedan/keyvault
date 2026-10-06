@@ -1,3 +1,3 @@
 // Loaded in <head>, before first paint: color theme, then language
-import "./theme.js";
-import "./i18n.js";
+import "./theme.ts";
+import "./i18n.ts";

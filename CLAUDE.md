@@ -26,7 +26,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/cli.ts` | the `kv` command (`npm link`) |
 | `src/ui-server.ts` + `src/ui.html` | browser UI for `kv ui`: 127.0.0.1, random port and token, Host/Origin checks |
 | `app/src-tauri/` | Tauri 2 shell: spawns `node backend.mjs` (bundled resource, `KV_BACKEND` override, source fallback in dev) and relays the `kv` command. No crypto |
-| `app/ui/` | the window — HTML/CSS + scripts bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`), CSP without inline script |
+| `app/ui/` | the window — HTML/CSS + TypeScript bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`). `app.ts` calls the backend through `kv<M>()` typed by `src/protocol.ts`; `globals.d.ts` types Tauri and `window.I18N`. CSP without inline script |
 | `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
 | `test/` | `node:test` suites (Node type stripping), each with its own temporary vault. `test/fixtures/vault-pre-ts.kv` is a vault written by v0.1 — it must keep opening unchanged. `*.typecheck.ts` are compile-time checks |
 
@@ -40,4 +40,4 @@ npm run app:build        # app/src-tauri/target/release/keyvault.exe
 npm run app:installer    # NSIS installer
 ```
 
-The interface is English by default with Hebrew as an option: backend/CLI strings in `src/i18n.ts` (`t(key)`), window strings in `app/ui/i18n.js` (`tr(key)`, `L({en, he})` for type labels). Every user-facing string goes through one of them — add both languages. Code, comments and docs are in English.
+The interface is English by default with Hebrew as an option: backend/CLI strings in `src/i18n.ts` (`t(key)`), window strings in `app/ui/i18n.ts` (`tr(key)`, `L({en, he})` for type labels). Every user-facing string goes through one of them — add both languages. Code, comments and docs are in English.
