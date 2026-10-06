@@ -61,7 +61,7 @@ jobs:
           f=$(ls app/src-tauri/target/release/bundle/nsis/*_x64-setup.exe)
           echo "file=$f" >> "$GITHUB_OUTPUT"
           echo "sha=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.installer.outputs.file }}
       - name: Release notes from CHANGELOG.md
