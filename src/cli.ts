@@ -10,7 +10,9 @@ import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { readLoginsFile } from "./import-csv.ts";
 import { diff as diffValues, type Diff, githubSecretNames, type Platform, PLATFORMS, pullVercel, push, vercelTarget } from "./platforms.ts";
+import { findLeaks, hookInstalled, installHook, stagedLines, trackedLines, uninstallHook } from "./guard.ts";
 import { findProject, suggestName, writeProject } from "./project.ts";
+import { scan } from "./scan.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
 import * as store from "./store.ts";
 
@@ -67,6 +69,18 @@ async function unlock(): Promise<store.Session> {
     }
   }
   return store.unlockWithPassword(await readHidden(t("cli.prompt.password")));
+}
+
+/** Unlock with the remembered key only — never prompt (git hooks and scans have no terminal) */
+async function unlockQuietly(): Promise<store.Session | null> {
+  if (!store.exists()) return null;
+  const cached = await remember.recall(store.salt());
+  if (!cached) return null;
+  try {
+    return await store.unlockWithKey(cached);
+  } catch {
+    return null;
+  }
 }
 
 async function newPassword(): Promise<string> {
@@ -382,6 +396,111 @@ const commands: Record<string, () => Promise<void>> = {
     for (const k of d.onlyPlatform) console.log(`  - ${k}  ${t("diff.onlyPlatform", { platform })}`);
     for (const k of d.changed) console.log(`  ~ ${k}  ${t("diff.changed")}`);
     console.log(`  = ${t("diff.same", { n: d.same })}${platform === "github" ? ` ${t("diff.namesOnly")}` : ""}`);
+  },
+
+  async guard() {
+    const sub = args[0];
+    if (sub === "install") {
+      args.shift();
+      err(t("guard.installed", { path: installHook(undefined, has("--force")) }));
+      return;
+    }
+    if (sub === "uninstall") {
+      const p = uninstallHook();
+      err(p ? t("guard.uninstalled", { path: p }) : t("guard.notInstalled"));
+      return;
+    }
+    if (sub && !sub.startsWith("--")) throw new UsageError(t("cli.usage.guard"));
+    const all = has("--all");
+    const strict = has("--strict");
+    // a git hook has no terminal: only a remembered key can unlock — otherwise skip (or block with --strict)
+    const session = await unlockQuietly();
+    if (!session) {
+      if (strict) throw new Error(t("guard.locked"));
+      err(t("guard.locked"));
+      return;
+    }
+    const lines = all ? trackedLines() : stagedLines();
+    const found = findLeaks(session.data, lines);
+    if (!found.length) {
+      err(t("guard.clean", { what: t(all ? "guard.tracked" : "guard.staged"), n: lines.length }));
+      return;
+    }
+    err(t(all ? "guard.foundAll" : "guard.found", { n: found.length }));
+    for (const f of found) err(t("guard.foundLine", { file: f.file, line: f.line, name: f.name }));
+    err(t("guard.hint"));
+    process.exitCode = 1;
+  },
+
+  async scan() {
+    const asJson = json();
+    const doImport = has("--import");
+    const dir = args.find((a) => !a.startsWith("--")) ?? process.cwd();
+    const session = doImport ? await unlock() : await unlockQuietly();
+    const found = scan(dir, session?.data ?? null);
+    if (doImport && session) {
+      // every real value not yet in the vault, into a project named after its folder
+      const byProject = new Map<string, string[]>();
+      for (const f of found) {
+        if (f.kind !== "env") continue;
+        const values = parseEnv(fs.readFileSync(f.file, "utf8"));
+        const project = suggestName(path.dirname(f.file));
+        for (const v of f.vars ?? []) {
+          if (!v.filled || v.inVault || !values[v.name]) continue;
+          store.setEntry(session.data, project, v.name, values[v.name]!, t("cli.importedFrom", { file: path.basename(f.file) }));
+          byProject.set(project, [...(byProject.get(project) ?? []), v.name]);
+        }
+      }
+      if (!byProject.size) return void err(t("scan.importNone"));
+      await store.save(session.key, session.data);
+      for (const [project, names] of byProject) err(t("scan.imported", { n: names.length, project, names: names.join(", ") }));
+      return;
+    }
+    if (asJson) return console.log(JSON.stringify(found, null, 2));
+    if (!found.length) return void err(t("scan.none", { dir }));
+    console.log(t("scan.title", { n: found.length, dir, note: session ? "" : t("scan.locked") }));
+    for (const f of found) {
+      const tags = [f.tracked ? t("scan.tracked") : "", f.kind === "env" ? "" : f.kind === "template" ? t("scan.template") : f.kind].filter(Boolean);
+      console.log(`${f.file}${tags.length ? `  [${tags.join(", ")}]` : ""}`);
+      for (const v of f.vars ?? []) {
+        if (!v.filled || f.kind === "template") continue;
+        console.log(`  ${v.name}  ${v.inVault ? t("scan.inVault", { where: v.inVault }) : session ? t("scan.notInVault") : ""}`.trimEnd());
+      }
+    }
+  },
+
+  async doctor() {
+    const ok = (s: string) => console.log(`  ✓ ${s}`);
+    const warn = (s: string) => console.log(`  ! ${s}`);
+    console.log(t("doctor.title"));
+    const [maj, min] = process.versions.node.split(".").map(Number) as [number, number];
+    (maj > 22 || (maj === 22 && min >= 6) ? ok : warn)(t(maj > 22 || (maj === 22 && min >= 6) ? "doctor.node" : "doctor.nodeOld", { version: process.versions.node }));
+    if (!store.exists()) return void warn(t("doctor.noVault"));
+    ok(t("doctor.vault", { path: store.VAULT }));
+    if (process.platform !== "win32") {
+      const mode = fs.statSync(store.VAULT).mode & 0o777;
+      if (mode & 0o077) warn(t("doctor.perms", { mode: mode.toString(8), path: store.VAULT }));
+    }
+    (remember.remembered() ? ok : warn)(t(remember.remembered() ? "doctor.remembered" : "doctor.notRemembered"));
+    const backupDir = process.env.KV_BACKUP_DIR || path.join(store.HOME, "backups");
+    const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir).filter((f) => /^vault_.*\.kv$/.test(f)).sort() : [];
+    if (!backups.length) warn(t("doctor.noBackup", { dir: backupDir }));
+    else {
+      const last = path.join(backupDir, backups[backups.length - 1]!);
+      const days = Math.floor((Date.now() - fs.statSync(last).mtimeMs) / 86_400_000);
+      (days <= 30 ? ok : warn)(t(days <= 30 ? "doctor.backup" : "doctor.oldBackup", { days, path: last }));
+    }
+    const session = await unlockQuietly();
+    const proj = findProject();
+    if (!proj) warn(t("doctor.noProject"));
+    else if (session && !session.data.projects[proj.project]) warn(t("doctor.projectMissing", { project: proj.project }));
+    else ok(t("doctor.project", { project: proj.project, n: session ? Object.keys(session.data.projects[proj.project] ?? {}).length : "?" }));
+    (hookInstalled() ? ok : warn)(t(hookInstalled() ? "doctor.guard" : "doctor.noGuard"));
+    if (session) {
+      const yearAgo = Date.now() - 365 * 86_400_000;
+      const stale = Object.entries(session.data.projects).flatMap(([p, keys]) => Object.entries(keys).filter(([, e]) => Date.parse(e.updated) < yearAgo).map(([k]) => `${p}/${k}`));
+      if (stale.length) warn(t("doctor.stale", { n: stale.length, names: stale.slice(0, 8).join(", ") + (stale.length > 8 ? ", …" : "") }));
+    }
   },
 
   async status() {

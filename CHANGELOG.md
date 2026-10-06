@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — unreleased
+
+### Added
+
+- **`kv guard`** — checks the lines a commit adds against every value in the vault (dev keys in every environment, secret fields of items; values of 8+ characters) and stops the commit, reporting file, line and key name — never the value. `kv guard install` / `uninstall` manage a pre-commit hook (and won't overwrite someone else's), `--all` sweeps every tracked file, `--strict` blocks when the vault is locked instead of skipping.
+- **`kv scan [dir]`** — finds `.env` files (templates marked), private keys, `.npmrc` tokens and credential JSON files; for each value, whether it is already in the vault (compared by hash) and whether the file is tracked by git. Paths and names only; `--json`. `--import` moves what isn't in the vault yet into a project per folder.
+- **`kv doctor`** — Node version, vault and its permissions, remember-me, last backup, `.kv.json` and its project, the guard hook, keys not updated for a year.
+
 ## 0.5.0 — unreleased
 
 ### Added

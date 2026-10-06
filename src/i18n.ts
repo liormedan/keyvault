@@ -24,6 +24,45 @@ const EN = {
     "ref.invalid": "Invalid name: \"{ref}\". Use project/KEY, e.g. my-app/API_KEY",
     "entry.notFound": "Not found: {ref}",
     "entry.missing": "Missing project, name or value (no / in the project name)",
+    "guard.hookExists": "{path} already exists and isn't kv's — add `kv guard || exit 1` to it yourself, or use --force to replace it",
+    "guard.installed": "Installed the pre-commit hook: {path}. Commits that contain a vault value will be stopped.",
+    "guard.uninstalled": "Removed the kv pre-commit hook: {path}",
+    "guard.notInstalled": "No kv pre-commit hook here",
+    "guard.clean": "kv guard: no vault values in {what} ({n} lines checked)",
+    "guard.found": "kv guard: {n} vault value(s) found — the commit is stopped:",
+    "guard.foundAll": "kv guard: {n} vault value(s) found in tracked files:",
+    "guard.foundLine": "  {file}:{line}  {name}",
+    "guard.hint": "Move them out (kv run / kv env), or remove them from the commit. To skip once: git commit --no-verify",
+    "guard.locked": "kv guard: skipped — the vault is locked (run kv unlock --remember so the hook can check). Use --strict to block instead.",
+    "guard.staged": "the staged changes",
+    "guard.tracked": "tracked files",
+    "scan.none": "No .env or key files found under {dir}",
+    "scan.title": "{n} files with keys under {dir}{note}",
+    "scan.locked": " (vault locked — can't tell what's already in it; run kv unlock --remember)",
+    "scan.tracked": "IN GIT",
+    "scan.template": "template",
+    "scan.inVault": "in vault: {where}",
+    "scan.notInVault": "not in the vault",
+    "scan.imported": "Imported {n} values into {project}: {names}",
+    "scan.importNone": "Nothing new to import",
+    "doctor.title": "kv doctor",
+    "doctor.node": "Node.js {version}",
+    "doctor.nodeOld": "Node.js {version} — kv needs 22.6 or newer",
+    "doctor.vault": "Vault at {path}",
+    "doctor.noVault": "No vault yet — run kv init",
+    "doctor.perms": "The vault file is readable by other users ({mode}) — chmod 600 {path}",
+    "doctor.remembered": "Remembered on this computer",
+    "doctor.notRemembered": "Not remembered — kv asks for the master password each time (kv unlock --remember)",
+    "doctor.backup": "Last backup {days} days ago ({path})",
+    "doctor.noBackup": "No backup in {dir} — run kv backup",
+    "doctor.oldBackup": "Last backup {days} days ago — run kv backup",
+    "doctor.project": "This folder is project {project} ({n} keys)",
+    "doctor.projectMissing": ".kv.json says {project}, which isn't in the vault",
+    "doctor.noProject": "No .kv.json here (kv init-project)",
+    "doctor.guard": "kv guard pre-commit hook installed in this repository",
+    "doctor.noGuard": "No kv guard hook in this repository (kv guard install)",
+    "doctor.stale": "{n} keys not updated for over a year: {names}",
+    "cli.usage.guard": "Usage: kv guard [--all] [--strict]   ·   kv guard install [--force]   ·   kv guard uninstall",
     "push.unsafeArg": "Refusing to pass {arg} to a platform CLI (only names, targets and repo names are allowed)",
     "push.noTool": "{tool} is not installed or not on PATH",
     "push.badTarget": "Unknown Vercel target {target}: use production, preview or development",
@@ -91,6 +130,9 @@ const EN = {
   kv push <vercel|github> [project] [--env e]   send the project's keys (values via stdin)
   kv pull vercel [project] [--env e]            bring Vercel's values into the vault
   kv diff <vercel|github> [project] [--env e]   what differs (names only, never values)
+  kv guard [--all] | install | uninstall       stop commits that contain a vault value
+  kv scan [dir] [--json] [--import]            find .env and key files; what's already in the vault
+  kv doctor                                    check the setup
   kv import <project> <file.env>   import an env file
   kv import-passwords <file.csv> [--delete]   import logins from a browser export (Chrome / Edge / Firefox)
   kv ui                            browser window to view, search and edit (local only)
@@ -197,6 +239,45 @@ const HE: Record<MessageKey, string> = {
     "ref.invalid": "שם לא תקין: \"{ref}\". הצורה: פרויקט/מפתח, למשל my-app/API_KEY",
     "entry.notFound": "לא נמצא: {ref}",
     "entry.missing": "חסר פרויקט, שם או ערך (בלי / בשם הפרויקט)",
+    "guard.hookExists": "{path} כבר קיים ואינו של kv — הוסף אליו בעצמך `kv guard || exit 1`, או ‎--force כדי להחליף",
+    "guard.installed": "הותקן pre-commit hook: {path}. קומיט שמכיל ערך מהכספת ייעצר.",
+    "guard.uninstalled": "הוסר ה-hook של kv: {path}",
+    "guard.notInstalled": "אין כאן hook של kv",
+    "guard.clean": "kv guard: אין ערכים מהכספת ב{what} (נבדקו {n} שורות)",
+    "guard.found": "kv guard: נמצאו {n} ערכים מהכספת — הקומיט נעצר:",
+    "guard.foundAll": "kv guard: נמצאו {n} ערכים מהכספת בקבצים שבגיט:",
+    "guard.foundLine": "  {file}:{line}  {name}",
+    "guard.hint": "הוצא אותם (kv run / kv env) או הסר אותם מהקומיט. לדלג פעם אחת: git commit --no-verify",
+    "guard.locked": "kv guard: דולג — הכספת נעולה (הרץ kv unlock --remember כדי שה-hook יוכל לבדוק). ‎--strict כדי לחסום במקום.",
+    "guard.staged": "שינויים שב-stage",
+    "guard.tracked": "קבצים שבגיט",
+    "scan.none": "לא נמצאו קובצי .env או מפתחות תחת {dir}",
+    "scan.title": "{n} קבצים עם מפתחות תחת {dir}{note}",
+    "scan.locked": " (הכספת נעולה — אי אפשר לדעת מה כבר בה; הרץ kv unlock --remember)",
+    "scan.tracked": "בגיט",
+    "scan.template": "תבנית",
+    "scan.inVault": "בכספת: {where}",
+    "scan.notInVault": "לא בכספת",
+    "scan.imported": "יובאו {n} ערכים ל-{project}: {names}",
+    "scan.importNone": "אין מה לייבא",
+    "doctor.title": "kv doctor",
+    "doctor.node": "Node.js {version}",
+    "doctor.nodeOld": "Node.js {version} — kv צריך 22.6 ומעלה",
+    "doctor.vault": "כספת ב-{path}",
+    "doctor.noVault": "אין עדיין כספת — הרץ kv init",
+    "doctor.perms": "קובץ הכספת קריא למשתמשים אחרים ({mode}) — chmod 600 {path}",
+    "doctor.remembered": "זכורה במחשב הזה",
+    "doctor.notRemembered": "לא זכורה — kv מבקש סיסמת אב בכל פעם (kv unlock --remember)",
+    "doctor.backup": "גיבוי אחרון לפני {days} ימים ({path})",
+    "doctor.noBackup": "אין גיבוי ב-{dir} — הרץ kv backup",
+    "doctor.oldBackup": "גיבוי אחרון לפני {days} ימים — הרץ kv backup",
+    "doctor.project": "התיקייה הזו היא הפרויקט {project} ({n} מפתחות)",
+    "doctor.projectMissing": ".kv.json מצביע על {project}, שלא קיים בכספת",
+    "doctor.noProject": "אין כאן .kv.json (kv init-project)",
+    "doctor.guard": "ה-hook של kv guard מותקן במאגר הזה",
+    "doctor.noGuard": "אין hook של kv guard במאגר הזה (kv guard install)",
+    "doctor.stale": "{n} מפתחות לא עודכנו יותר משנה: {names}",
+    "cli.usage.guard": "שימוש: kv guard [--all] [--strict]   ·   kv guard install [--force]   ·   kv guard uninstall",
     "push.unsafeArg": "לא מעביר את {arg} לכלי של הפלטפורמה (מותרים רק שמות, יעדים ושמות מאגר)",
     "push.noTool": "{tool} לא מותקן או לא נמצא ב-PATH",
     "push.badTarget": "יעד Vercel לא מוכר: {target}. אפשר production, preview או development",
@@ -264,6 +345,9 @@ const HE: Record<MessageKey, string> = {
   kv push <vercel|github> [פרויקט] [--env e]   שליחת מפתחות הפרויקט (ערכים דרך stdin)
   kv pull vercel [פרויקט] [--env e]            משיכת הערכים מ-Vercel לכספת
   kv diff <vercel|github> [פרויקט] [--env e]   מה שונה (שמות בלבד, אף פעם לא ערכים)
+  kv guard [--all] | install | uninstall       חוסם קומיט שמכיל ערך מהכספת
+  kv scan [תיקייה] [--json] [--import]         מוצא קובצי .env ומפתחות; מה כבר בכספת
+  kv doctor                                    בדיקת ההתקנה
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
   kv import-passwords <קובץ.csv> [--delete]   ייבוא סיסמאות מקובץ ייצוא של דפדפן (Chrome / Edge / Firefox)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)

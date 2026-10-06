@@ -1,6 +1,6 @@
 {
   "name": "kv-vault",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A local, encrypted vault for developer keys and passwords — one file, a Tauri desktop app and a CLI. libsodium only.",
   "license": "MIT",
   "author": "Lior Medan",
