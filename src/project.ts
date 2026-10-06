@@ -46,7 +46,12 @@ export function suggestName(dir: string = process.cwd()): string {
 
 export function writeProject(dir: string, file: ProjectFile, force = false): string {
   const f = path.join(dir, PROJECT_FILE);
-  if (fs.existsSync(f) && !force) throw new Error(t("project.fileExists", { path: f }));
-  fs.writeFileSync(f, `${JSON.stringify(file, null, 2)}\n`);
+  try {
+    // "wx": create, failing if it exists — one step, so nothing can appear between a check and the write
+    fs.writeFileSync(f, `${JSON.stringify(file, null, 2)}\n`, { flag: force ? "w" : "wx" });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(t("project.fileExists", { path: f }));
+    throw e;
+  }
   return f;
 }
