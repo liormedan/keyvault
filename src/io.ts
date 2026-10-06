@@ -53,13 +53,16 @@ export const WIN_PRIVATE_COPY =
   "[System.Windows.Forms.Clipboard]::SetDataObject($d, $true)";
 
 // Copies to the clipboard and clears it after `seconds` — only if it still holds the same value (compares a hash, not the value).
+// The clear runs in a detached PowerShell so it outlives `kv copy`. KV_CLIPBOARD_LOG (tests) records what it did.
 export function copyWithClear(value: string, seconds: number = 20): void {
   execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
+  const log = process.env.KV_CLIPBOARD_LOG ? ` *> '${process.env.KV_CLIPBOARD_LOG.replace(/'/g, "''")}'` : "";
   const script =
-    `Start-Sleep -Seconds ${seconds}; $c = Get-Clipboard -Raw; if ($c) { ` +
-    `$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c.TrimEnd([char]13,[char]10)))).Replace('-','').ToLower(); ` +
-    `if ($h -eq '${sha(value)}') { Set-Clipboard -Value $null } }`;
-  spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
+    `& { Start-Sleep -Seconds ${seconds}; Add-Type -AssemblyName System.Windows.Forms; ` +
+    `$c = [System.Windows.Forms.Clipboard]::GetText(); if ($c) { ` +
+    `$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c))).Replace('-','').ToLower(); ` +
+    `if ($h -eq '${sha(value)}') { [System.Windows.Forms.Clipboard]::Clear(); 'cleared' } else { 'changed since — left alone' } } else { 'empty' } }${log}`;
+  spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-Command", script], {
     detached: true,
     stdio: "ignore",
     windowsHide: true,
