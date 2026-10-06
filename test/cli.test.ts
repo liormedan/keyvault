@@ -33,7 +33,9 @@ test("kv ls --json lists names and notes, never values", { skip: process.platfor
     const { key, data } = await s.create(${JSON.stringify(PW)});
     s.setEntry(data, "demo", "API_KEY", "cli-secret-value", "a note");
     await s.save(key, data); await r.remember(key, s.salt());`;
-  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], { env: { ...process.env, KV_HOME: HOME } });
+  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], {
+    env: { ...process.env, KV_HOME: HOME },
+  });
   const out = await runCliFull(HOME, ["ls", "--json"]);
   assert.equal(out.code, 0, out.stderr);
   const list = JSON.parse(out.stdout);
@@ -56,17 +58,21 @@ test("completion scripts: every shell, every command", () => {
   }
 });
 
-test("project workflow: init-project, run without a name, env formats, example, check, mv", { skip: process.platform !== "win32" && "unlocks through DPAPI remember-me" }, async () => {
+test("project workflow: init-project, run without a name, env formats, example, check, mv", {
+  skip: process.platform !== "win32" && "unlocks through DPAPI remember-me",
+}, async () => {
   // a vault with tricky values, remembered in the temp folder (same setup as the ls --json test)
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-cli-proj-"));
-  const tricky = "it's \"quoted\" $HOME ` back\\slash";
+  const tricky = 'it\'s "quoted" $HOME ` back\\slash';
   const setup = `import * as s from "./src/store.ts"; import * as r from "./src/remember.ts";
     const { key, data } = await s.create("proj pw");
     s.setEntry(data, "web", "API_KEY", "dev-key");
     s.setEntry(data, "web", "API_KEY", "prod-key", undefined, "prod");
     s.setEntry(data, "web", "TRICKY", ${JSON.stringify(tricky)});
     await s.save(key, data); await r.remember(key, s.salt());`;
-  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], { env: { ...process.env, KV_HOME: home } });
+  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], {
+    env: { ...process.env, KV_HOME: home },
+  });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kv-cli-repo-"));
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "web" }));
   const kv = (args: string[]) => runCliFull(home, args, {}, dir);
@@ -83,7 +89,13 @@ test("project workflow: init-project, run without a name, env formats, example, 
   const sh = (await kv(["env", "--format", "sh"])).stdout;
   assert.equal(execFileSync("bash", ["-c", 'eval "$(cat)"; printf %s "$TRICKY"'], { input: sh, encoding: "utf8" }), tricky);
   const pwsh = (await kv(["env", "--format", "pwsh", "--env", "prod"])).stdout;
-  assert.equal(execFileSync("powershell.exe", ["-NoProfile", "-Command", "Invoke-Expression ([Console]::In.ReadToEnd()); [Console]::Out.Write($env:API_KEY)"], { input: pwsh, encoding: "utf8" }), "prod-key");
+  assert.equal(
+    execFileSync("powershell.exe", ["-NoProfile", "-Command", "Invoke-Expression ([Console]::In.ReadToEnd()); [Console]::Out.Write($env:API_KEY)"], {
+      input: pwsh,
+      encoding: "utf8",
+    }),
+    "prod-key",
+  );
 
   assert.equal((await kv(["example"])).stdout, "API_KEY=\nTRICKY=\n");
   fs.writeFileSync(path.join(dir, ".env.example"), "API_KEY=\nMISSING_ONE=\n");

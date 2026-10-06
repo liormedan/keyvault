@@ -7,10 +7,16 @@ import { test } from "node:test";
 import { diff, githubSecretNames, pullVercel, push, runTool, type Runner, vercelTarget } from "../src/platforms.ts";
 import { runCliFull } from "./helpers.ts";
 
-const parseEnv = (text: string) => Object.fromEntries(text.split(/\r?\n/).filter((l) => l.includes("=")).map((l) => {
-  const i = l.indexOf("=");
-  return [l.slice(0, i), l.slice(i + 1).replace(/^"(.*)"$/, "$1")];
-}));
+const parseEnv = (text: string) =>
+  Object.fromEntries(
+    text
+      .split(/\r?\n/)
+      .filter((l) => l.includes("="))
+      .map((l) => {
+        const i = l.indexOf("=");
+        return [l.slice(0, i), l.slice(i + 1).replace(/^"(.*)"$/, "$1")];
+      }),
+  );
 
 /** Records every call; values must arrive on stdin and never in args */
 function recorder(reply: (cmd: string, args: string[]) => { status?: number; stdout?: string } = () => ({})) {
@@ -96,25 +102,41 @@ test("kv push / pull / diff end to end with fake platform CLIs", { skip: process
     s.setEntry(data, "web", "API_KEY", "prod-key", undefined, "prod");
     s.setEntry(data, "web", "ONLY_HERE", "x");
     await s.save(key, data); await r.remember(key, s.salt());`;
-  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], { env: { ...process.env, KV_HOME: home } });
+  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], {
+    env: { ...process.env, KV_HOME: home },
+  });
 
   // fake CLIs: log argv + stdin; `vercel env pull` writes a dotenv; `gh secret list` prints names
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), "kv-fakebin-"));
   const log = path.join(bin, "calls.jsonl");
   const fake = path.join(bin, "fake.mjs");
-  fs.writeFileSync(fake, `import fs from "node:fs";
+  fs.writeFileSync(
+    fake,
+    `import fs from "node:fs";
     const [tool, ...args] = process.argv.slice(2);
     const input = fs.readFileSync(0, "utf8");
     fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ tool, args, input }) + "\\n");
     if (tool === "vercel" && args[1] === "pull") fs.writeFileSync(args[2], 'API_KEY="prod-key"\\nFROM_VERCEL="v"\\nVERCEL_ENV="production"\\n');
-    if (tool === "gh" && args[1] === "list") process.stdout.write(JSON.stringify([{ name: "API_KEY" }, { name: "ON_GITHUB" }]));`);
+    if (tool === "gh" && args[1] === "list") process.stdout.write(JSON.stringify([{ name: "API_KEY" }, { name: "ON_GITHUB" }]));`,
+  );
   for (const tool of ["vercel", "gh"]) fs.writeFileSync(path.join(bin, `${tool}.cmd`), `@node "${fake}" ${tool} %*\r\n`);
   const env = { PATH: `${bin}${path.delimiter}${process.env.PATH}` };
-  const calls = () => fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l) as { tool: string; args: string[]; input: string });
+  const calls = () =>
+    fs
+      .readFileSync(log, "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as { tool: string; args: string[]; input: string });
 
   const pushed = await runCliFull(home, ["push", "vercel", "web", "--env", "prod"], env);
   assert.equal(pushed.code, 0, pushed.stderr);
-  assert.deepEqual(calls().map((c) => [c.args.slice(0, 4).join(" "), c.input]), [["env add API_KEY production", "prod-key"], ["env add ONLY_HERE production", "x"]]);
+  assert.deepEqual(
+    calls().map((c) => [c.args.slice(0, 4).join(" "), c.input]),
+    [
+      ["env add API_KEY production", "prod-key"],
+      ["env add ONLY_HERE production", "x"],
+    ],
+  );
   assert.ok(!pushed.stderr.includes("prod-key"), "values are not printed");
 
   const d = await runCliFull(home, ["diff", "vercel", "web", "--env", "prod", "--json"], env);
@@ -126,7 +148,14 @@ test("kv push / pull / diff end to end with fake platform CLIs", { skip: process
 
   assert.equal((await runCliFull(home, ["pull", "vercel", "web", "--env", "prod"], env)).code, 0);
   const listed = JSON.parse((await runCliFull(home, ["ls", "--json"], env)).stdout) as Record<string, { key: string; envs?: string[] }[]>;
-  assert.deepEqual(listed.web!.map((e) => [e.key, e.envs ?? []]), [["API_KEY", ["prod"]], ["FROM_VERCEL", ["prod"]], ["ONLY_HERE", []]]);
+  assert.deepEqual(
+    listed.web!.map((e) => [e.key, e.envs ?? []]),
+    [
+      ["API_KEY", ["prod"]],
+      ["FROM_VERCEL", ["prod"]],
+      ["ONLY_HERE", []],
+    ],
+  );
 
   assert.equal((await runCliFull(home, ["push", "netlify", "web"], env)).code, 2);
   assert.equal((await runCliFull(home, ["pull", "github", "web"], env)).code, 2, "GitHub secrets can't be read back");

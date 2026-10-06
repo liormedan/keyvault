@@ -42,16 +42,34 @@ fn backend_script(app: &AppHandle) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/backend.mjs")
 }
 
+// Tauri can hand back verbatim paths (`\\?\D:\…`); Node's module loader fails on them with
+// `EISDIR: lstat 'D:'` (seen on GitHub's Windows runner). Drive paths don't need the prefix.
+fn plain_path(p: &std::path::Path) -> PathBuf {
+    let s = p.to_string_lossy();
+    match s.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
+        _ => p.to_path_buf(),
+    }
+}
+
+// KV_BACKEND_LOG: the window test collects the backend's stderr (startup errors only — it never writes values)
+fn backend_stderr() -> Stdio {
+    std::env::var("KV_BACKEND_LOG")
+        .ok()
+        .and_then(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).ok())
+        .map_or_else(Stdio::null, Stdio::from)
+}
+
 fn spawn(app: &AppHandle) -> Result<Backend, String> {
     let script = backend_script(app);
     if !script.exists() {
         return Err(format!("backend not found: {}", script.display()));
     }
     let mut cmd = Command::new("node");
-    cmd.arg(&script)
+    cmd.arg(plain_path(&script))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(backend_stderr());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

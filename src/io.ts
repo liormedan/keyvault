@@ -35,7 +35,9 @@ export function readHidden(prompt: string): Promise<string> {
 export async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of process.stdin) chunks.push(c);
-  return Buffer.concat(chunks).toString("utf8").replace(/\r?\n$/, "");
+  return Buffer.concat(chunks)
+    .toString("utf8")
+    .replace(/\r?\n$/, "");
 }
 
 const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
@@ -95,7 +97,9 @@ export function copyWithClear(value: string, seconds: number = 20): void {
 export function clearScript(hash: string, seconds: number, tl: Tool | "windows" = tool()): string {
   const body =
     tl === "windows"
-      ? [`out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(hash))}], { encoding: "utf8", windowsHide: true }).trim();`]
+      ? [
+          `out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(hash))}], { encoding: "utf8", windowsHide: true }).trim();`,
+        ]
       : [
           `const now = execFileSync(${JSON.stringify(tl.read[0])}, ${JSON.stringify(tl.read[1])}, { encoding: "utf8" });`,
           `const h = require("node:crypto").createHash("sha256").update(now, "utf8").digest("hex");`,

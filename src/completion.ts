@@ -2,8 +2,35 @@
 // key names would mean unlocking the vault from a shell hook, which kv never does.
 
 export const COMMANDS = [
-  "init", "set", "get", "copy", "ls", "rm", "run", "env", "init-project", "example", "check", "mv", "push", "pull", "diff", "guard", "scan", "doctor",
-  "import", "import-passwords", "ui", "unlock", "forget", "backup", "passwd", "lang", "status", "completion", "help",
+  "init",
+  "set",
+  "get",
+  "copy",
+  "ls",
+  "rm",
+  "run",
+  "env",
+  "init-project",
+  "example",
+  "check",
+  "mv",
+  "push",
+  "pull",
+  "diff",
+  "guard",
+  "scan",
+  "doctor",
+  "import",
+  "import-passwords",
+  "ui",
+  "unlock",
+  "forget",
+  "backup",
+  "passwd",
+  "lang",
+  "status",
+  "completion",
+  "help",
 ] as const;
 
 const FLAGS: Partial<Record<(typeof COMMANDS)[number], string[]>> = {
@@ -39,8 +66,10 @@ export function completion(shell: Shell): string {
       return [
         "# kv completion — add to ~/.bashrc:  source <(kv completion bash)",
         "_kv() {",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax in the generated script, not a JS template
         '  local cur="${COMP_WORDS[COMP_CWORD]}"',
         `  if [ "$COMP_CWORD" -eq 1 ]; then COMPREPLY=($(compgen -W "${cmds}" -- "$cur")); return; fi`,
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax in the generated script, not a JS template
         '  case "${COMP_WORDS[1]}" in',
         ...cases.map(([c, f]) => `    ${c}) COMPREPLY=($(compgen -W "${f}" -- "$cur")) ;;`),
         "  esac",
@@ -54,6 +83,7 @@ export function completion(shell: Shell): string {
         "# kv completion — add to ~/.zshrc:  source <(kv completion zsh)",
         "_kv() {",
         `  if (( CURRENT == 2 )); then compadd -- ${cmds}; return; fi`,
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax in the generated script, not a JS template
         "  case ${words[2]} in",
         ...cases.map(([c, f]) => `    ${c}) compadd -- ${f} ;;`),
         "  esac",
@@ -80,7 +110,7 @@ export function completion(shell: Shell): string {
         "      default { @() }",
         "    }",
         "  }",
-        "  $options | Where-Object { $_ -like \"$word*\" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }",
+        '  $options | Where-Object { $_ -like "$word*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }',
         "}",
         "",
       ].join("\n");

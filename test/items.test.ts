@@ -60,8 +60,14 @@ test("items: save, secrets masked in list and item, update, favorite, delete", a
 
 test("every type has an existing primary field and marked secrets", () => {
   for (const [name, t] of Object.entries(TYPES)) {
-    assert.ok(t.fields.some((f) => f.k === t.primary), `${name}: primary`);
-    assert.ok(t.fields.some((f) => f.secret), `${name}: has a secret field`);
+    assert.ok(
+      t.fields.some((f) => f.k === t.primary),
+      `${name}: primary`,
+    );
+    assert.ok(
+      t.fields.some((f) => f.secret),
+      `${name}: has a secret field`,
+    );
   }
 });
 

@@ -1,7 +1,7 @@
 // The desktop window. Every action goes to the backend (src/backend.ts) through Tauri's `kv` command,
 // typed against src/protocol.ts — the same contract the backend implements.
 // Secret fields reach the window only on reveal or edit; copy goes from the backend straight to the clipboard.
-import type { FieldDef, ItemTypeName, ListedDevKey as DevEntryRow, ListedItem, TypeDef } from "../../src/model.ts";
+import type { FieldDef, ItemTypeName, ListedDevKey as DevEntryRow, ListedItem, MaskedItem, TypeDef } from "../../src/model.ts";
 import type { ImportResult, Method, Params, Result, Status } from "../../src/protocol.ts";
 import { LOCKED } from "../../src/protocol.ts";
 
@@ -18,7 +18,11 @@ const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
 
 type Kid = Node | string | null | undefined | false;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Partial<HTMLElementTagNameMap[K]> & Record<string, unknown> = {}, ...kids: Kid[]): HTMLElementTagNameMap[K] {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  attrs: Partial<HTMLElementTagNameMap[K]> & Record<string, unknown> = {},
+  ...kids: Kid[]
+): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   Object.assign(e, attrs);
   e.append(...kids.filter((k): k is Node | string => k != null && k !== false));
@@ -122,9 +126,19 @@ const devCount = () => Object.values(projects).reduce((n, keys) => n + keys.leng
 function renderCats(): void {
   const count = (t: ItemTypeName) => items.filter((i) => i.type === t).length;
   const btn = (id: Category, label: string, n: number) =>
-    el("button", { type: "button", ariaCurrent: String(cat === id), onclick: () => { cat = id; render(); } },
+    el(
+      "button",
+      {
+        type: "button",
+        ariaCurrent: String(cat === id),
+        onclick: () => {
+          cat = id;
+          render();
+        },
+      },
       el("span", { textContent: label }),
-      el("span", { className: "count", textContent: n ? String(n) : "" }));
+      el("span", { className: "count", textContent: n ? String(n) : "" }),
+    );
   $("#cats").replaceChildren(
     btn("all", tr("cat.all"), items.length + devCount()),
     btn("fav", tr("cat.fav"), items.filter((i) => i.fav).length),
@@ -138,7 +152,13 @@ function renderCats(): void {
 function render(): void {
   renderCats();
   const q = $<HTMLInputElement>("#q").value.trim().toLowerCase();
-  const hit = (...s: (string | undefined)[]) => !q || s.some((x) => String(x || "").toLowerCase().includes(q));
+  const hit = (...s: (string | undefined)[]) =>
+    !q ||
+    s.some((x) =>
+      String(x || "")
+        .toLowerCase()
+        .includes(q),
+    );
   const out: HTMLElement[] = [];
 
   if (cat !== DEV) {
@@ -162,47 +182,94 @@ function render(): void {
 function itemRow(i: ListedItem): HTMLElement {
   const def = TYPES[i.type];
   const primary = def.fields.find((f) => f.k === def.primary);
-  return el("div", { className: "item" },
+  return el(
+    "div",
+    { className: "item" },
     el("button", {
-      className: "star", type: "button", textContent: "★", title: i.fav ? tr("fav.remove") : tr("fav.add"),
-      ariaPressed: String(i.fav), ariaLabel: tr("fav.label"),
-      onclick: safe(async () => { await kv("itemFav", { id: i.id, fav: !i.fav }); await load(); }),
+      className: "star",
+      type: "button",
+      textContent: "★",
+      title: i.fav ? tr("fav.remove") : tr("fav.add"),
+      ariaPressed: String(i.fav),
+      ariaLabel: tr("fav.label"),
+      onclick: safe(async () => {
+        await kv("itemFav", { id: i.id, fav: !i.fav });
+        await load();
+      }),
     }),
-    el("button", { className: "open", type: "button", onclick: () => void openItem(i.id) },
+    el(
+      "button",
+      { className: "open", type: "button", onclick: () => void openItem(i.id) },
       el("span", { className: "title" }, i.title, cat === "all" || cat === "fav" ? el("span", { className: "kind", textContent: L(def.label) }) : null),
-      el("span", { className: "sub" }, ...bidiParts(i.sub))),
-    el("div", { className: "actions" },
+      el("span", { className: "sub" }, ...bidiParts(i.sub)),
+    ),
+    el(
+      "div",
+      { className: "actions" },
       el("button", {
-        type: "button", textContent: tr("copyField", { field: L(primary?.label) }),
-        onclick: safe(async () => { await kv("itemCopy", { id: i.id, k: def.primary }); toast(tr("copied")); }),
-      })));
+        type: "button",
+        textContent: tr("copyField", { field: L(primary?.label) }),
+        onclick: safe(async () => {
+          await kv("itemCopy", { id: i.id, k: def.primary });
+          toast(tr("copied"));
+        }),
+      }),
+    ),
+  );
 }
 
 function devRow(p: string, e: DevEntryRow): HTMLElement {
   const shown = el("span");
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
-  const hide = () => { clearTimeout(hideTimer); shown.replaceChildren(); reveal.textContent = tr("show"); };
-  const reveal = el("button", { textContent: tr("show"), onclick: safe(async () => {
-    if (shown.textContent) return hide();
-    const { value } = await kv("value", { p, k: e.key });
-    shown.replaceChildren(el("span", { className: "val", textContent: value }));
-    reveal.textContent = tr("hide");
-    hideTimer = setTimeout(hide, 15000);
-  }) });
-  const copy = el("button", { textContent: tr("copy"), onclick: safe(async () => { await kv("copy", { p, k: e.key }); toast(tr("copied")); }) });
+  const hide = () => {
+    clearTimeout(hideTimer);
+    shown.replaceChildren();
+    reveal.textContent = tr("show");
+  };
+  const reveal = el("button", {
+    textContent: tr("show"),
+    onclick: safe(async () => {
+      if (shown.textContent) return hide();
+      const { value } = await kv("value", { p, k: e.key });
+      shown.replaceChildren(el("span", { className: "val", textContent: value }));
+      reveal.textContent = tr("hide");
+      hideTimer = setTimeout(hide, 15000);
+    }),
+  });
+  const copy = el("button", {
+    textContent: tr("copy"),
+    onclick: safe(async () => {
+      await kv("copy", { p, k: e.key });
+      toast(tr("copied"));
+    }),
+  });
   const edit = el("button", { textContent: tr("edit"), onclick: () => openDev(p, e) });
-  const del = el("button", { className: "danger", textContent: tr("delete"), onclick: safe(async () => {
-    if (!(await ask(tr("confirmDelete", { name: `${p}/${e.key}` })))) return;
-    await kv("delete", { p, k: e.key });
-    toast(tr("deleted"));
-    await load();
-  }) });
-  return el("div", { className: "row" },
-    el("div", {},
-      el("div", { className: "name", textContent: e.key }, ...(e.envs ?? []).map((n) => el("span", { className: "env-tag", textContent: n, title: tr("dev.envTag") }))),
-      el("div", { className: "note", textContent: e.note || "" })),
+  const del = el("button", {
+    className: "danger",
+    textContent: tr("delete"),
+    onclick: safe(async () => {
+      if (!(await ask(tr("confirmDelete", { name: `${p}/${e.key}` })))) return;
+      await kv("delete", { p, k: e.key });
+      toast(tr("deleted"));
+      await load();
+    }),
+  });
+  return el(
+    "div",
+    { className: "row" },
+    el(
+      "div",
+      {},
+      el(
+        "div",
+        { className: "name", textContent: e.key },
+        ...(e.envs ?? []).map((n) => el("span", { className: "env-tag", textContent: n, title: tr("dev.envTag") })),
+      ),
+      el("div", { className: "note", textContent: e.note || "" }),
+    ),
     shown,
-    el("div", { className: "actions" }, reveal, copy, edit, del));
+    el("div", { className: "actions" }, reveal, copy, edit, del),
+  );
 }
 
 // ── Item: view ──
@@ -211,16 +278,15 @@ const dlg = () => $<HTMLDialogElement>("#itemDlg");
 
 // Each subtitle part keeps its own direction — otherwise "•••• 9012 · 08/29" flips in the RTL layout
 const bidiParts = (text: string): (string | HTMLElement)[] =>
-  String(text || "").split(" · ").flatMap((part, i) => [
-    ...(i ? [" · "] : []),
-    el("span", { dir: /[֐-׿]/.test(part) ? "rtl" : "ltr", textContent: part }),
-  ]);
+  String(text || "")
+    .split(" · ")
+    .flatMap((part, i) => [...(i ? [" · "] : []), el("span", { dir: /[֐-׿]/.test(part) ? "rtl" : "ltr", textContent: part })]);
 
 const cardFmt = (v: string) => v.replace(/\D/g, "").replace(/(.{4})(?=.)/g, "$1 ");
 const MASK = "••••••••";
 
 async function openItem(id: string): Promise<void> {
-  let item;
+  let item: MaskedItem;
   try {
     ({ item } = await kv("item", { id }));
   } catch (e) {
@@ -228,42 +294,75 @@ async function openItem(id: string): Promise<void> {
     return;
   }
   const def = TYPES[item.type];
-  const rows = def.fields.filter((f) => item.fields[f.k] != null).map((f) => {
-    const v = item.fields[f.k];
-    const val = el("span", { className: `v${f.ltr ? " ltr" : ""}` });
-    const copy = el("button", { type: "button", textContent: tr("copy"), onclick: safe(async () => { await kv("itemCopy", { id, k: f.k }); toast(tr("copied")); }) });
-    if (typeof v === "string") {
-      val.textContent = v;
-      return el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, copy));
-    }
-    val.textContent = MASK;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const conceal = () => { delete reveal.dataset.on; val.textContent = MASK; reveal.textContent = tr("show"); };
-    const reveal = el("button", { type: "button", textContent: tr("show"), onclick: safe(async () => {
-      if (reveal.dataset.on) { clearTimeout(timer); return conceal(); }
-      const { value } = await kv("itemValue", { id, k: f.k });
-      val.textContent = f.kind === "card" ? cardFmt(value) : value;
-      reveal.textContent = tr("hide");
-      reveal.dataset.on = "1";
-      timer = setTimeout(conceal, 30000);
-    }) });
-    return el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, reveal, copy));
-  });
+  const rows = def.fields
+    .filter((f) => item.fields[f.k] != null)
+    .map((f) => {
+      const v = item.fields[f.k];
+      const val = el("span", { className: `v${f.ltr ? " ltr" : ""}` });
+      const copy = el("button", {
+        type: "button",
+        textContent: tr("copy"),
+        onclick: safe(async () => {
+          await kv("itemCopy", { id, k: f.k });
+          toast(tr("copied"));
+        }),
+      });
+      if (typeof v === "string") {
+        val.textContent = v;
+        return el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, copy));
+      }
+      val.textContent = MASK;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const conceal = () => {
+        delete reveal.dataset.on;
+        val.textContent = MASK;
+        reveal.textContent = tr("show");
+      };
+      const reveal = el("button", {
+        type: "button",
+        textContent: tr("show"),
+        onclick: safe(async () => {
+          if (reveal.dataset.on) {
+            clearTimeout(timer);
+            return conceal();
+          }
+          const { value } = await kv("itemValue", { id, k: f.k });
+          val.textContent = f.kind === "card" ? cardFmt(value) : value;
+          reveal.textContent = tr("hide");
+          reveal.dataset.on = "1";
+          timer = setTimeout(conceal, 30000);
+        }),
+      });
+      return el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, reveal, copy));
+    });
 
-  dlg().replaceChildren(el("div", { className: "fields-wrap" },
-    el("h2", { textContent: item.title }),
-    el("p", { className: "muted", textContent: L(def.label) }),
-    rows.length ? el("dl", { className: "fields" }, ...rows) : el("p", { className: "muted", textContent: tr("item.noFields") }),
-    el("div", { className: "actions" },
-      el("button", { type: "button", className: "danger", textContent: tr("delete"), onclick: safe(async () => {
-        if (!(await ask(tr("confirmDelete", { name: `"${item.title}"` })))) return;
-        await kv("itemDelete", { id });
-        dlg().close();
-        toast(tr("deleted"));
-        await load();
-      }) }),
-      el("button", { type: "button", textContent: tr("edit"), onclick: () => void editItem(item.type, id) }),
-      el("button", { type: "button", className: "primary", textContent: tr("close"), onclick: () => dlg().close() }))));
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: item.title }),
+      el("p", { className: "muted", textContent: L(def.label) }),
+      rows.length ? el("dl", { className: "fields" }, ...rows) : el("p", { className: "muted", textContent: tr("item.noFields") }),
+      el(
+        "div",
+        { className: "actions" },
+        el("button", {
+          type: "button",
+          className: "danger",
+          textContent: tr("delete"),
+          onclick: safe(async () => {
+            if (!(await ask(tr("confirmDelete", { name: `"${item.title}"` })))) return;
+            await kv("itemDelete", { id });
+            dlg().close();
+            toast(tr("deleted"));
+            await load();
+          }),
+        }),
+        el("button", { type: "button", textContent: tr("edit"), onclick: () => void editItem(item.type, id) }),
+        el("button", { type: "button", className: "primary", textContent: tr("close"), onclick: () => dlg().close() }),
+      ),
+    ),
+  );
   if (!dlg().open) dlg().showModal();
 }
 
@@ -286,38 +385,61 @@ async function editItem(type: ItemTypeName, id?: string): Promise<void> {
   const inputs: Record<string, HTMLInputElement | HTMLTextAreaElement> = {};
   const title = el("input", { name: "title", required: true, value: current.title, placeholder: L(def.label) });
   const rows = def.fields.map((f: FieldDef) => {
-    const base = { name: f.k, value: current.fields[f.k] || "", placeholder: f.placeholder || "", autocomplete: "off" as AutoFill, spellcheck: false, ...(f.ltr ? { dir: "ltr" } : {}) };
+    const base = {
+      name: f.k,
+      value: current.fields[f.k] || "",
+      placeholder: f.placeholder || "",
+      autocomplete: "off" as AutoFill,
+      spellcheck: false,
+      ...(f.ltr ? { dir: "ltr" } : {}),
+    };
     const multi = f.kind === "multiline";
     const input = multi ? el("textarea", { ...base, rows: 4 }) : el("input", { ...base, type: f.secret ? "password" : "text" });
     inputs[f.k] = input;
     const extra: HTMLElement[] = [];
     if (f.secret && input instanceof HTMLInputElement) {
-      const eye = el("button", { type: "button", textContent: tr("show"), onclick: () => {
-        const hidden = input.type === "password";
-        input.type = hidden ? "text" : "password";
-        eye.textContent = hidden ? tr("hide") : tr("show");
-      } });
+      const eye = el("button", {
+        type: "button",
+        textContent: tr("show"),
+        onclick: () => {
+          const hidden = input.type === "password";
+          input.type = hidden ? "text" : "password";
+          eye.textContent = hidden ? tr("hide") : tr("show");
+        },
+      });
       extra.push(eye);
       if (f.generate) {
-        extra.push(el("button", { type: "button", textContent: tr("generate"), onclick: safe(async () => {
-          input.value = (await kv("generate", { length: 20 })).value;
-          input.type = "text";
-          eye.textContent = tr("hide");
-        }) }));
+        extra.push(
+          el("button", {
+            type: "button",
+            textContent: tr("generate"),
+            onclick: safe(async () => {
+              input.value = (await kv("generate", { length: 20 })).value;
+              input.type = "text";
+              eye.textContent = tr("hide");
+            }),
+          }),
+        );
       }
     }
     return el("label", {}, L(f.label), extra.length ? el("div", { className: "field-row" }, input, ...extra) : input);
   });
 
   const errEl = el("p", { className: "err", role: "alert" });
-  const form = el("form", { method: "dialog" },
+  const form = el(
+    "form",
+    { method: "dialog" },
     el("h2", { textContent: tr(id ? "item.editTitle" : "item.addTitle", { type: L(def.label) }) }),
     el("label", {}, tr("item.title"), title),
     ...rows,
     errEl,
-    el("div", { className: "actions" },
+    el(
+      "div",
+      { className: "actions" },
       el("button", { type: "button", textContent: tr("cancel"), onclick: () => (id ? void openItem(id) : dlg().close()) }),
-      el("button", { type: "submit", className: "primary", textContent: tr("save") })));
+      el("button", { type: "submit", className: "primary", textContent: tr("save") }),
+    ),
+  );
 
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -341,9 +463,33 @@ function pickType(): void {
   const pick = $<HTMLDialogElement>("#pick");
   $("#pickGrid").replaceChildren(
     ...(Object.entries(TYPES) as [ItemTypeName, TypeDef][]).map(([t, d]) =>
-      el("button", { type: "button", textContent: L(d.label), onclick: () => { pick.close(); void editItem(t); } })),
-    el("button", { type: "button", textContent: tr("pick.devKey"), onclick: () => { pick.close(); openDev(); } }),
-    el("button", { type: "button", className: "wide-btn", textContent: tr("pick.import"), onclick: () => { pick.close(); openImport(); } }));
+      el("button", {
+        type: "button",
+        textContent: L(d.label),
+        onclick: () => {
+          pick.close();
+          void editItem(t);
+        },
+      }),
+    ),
+    el("button", {
+      type: "button",
+      textContent: tr("pick.devKey"),
+      onclick: () => {
+        pick.close();
+        openDev();
+      },
+    }),
+    el("button", {
+      type: "button",
+      className: "wide-btn",
+      textContent: tr("pick.import"),
+      onclick: () => {
+        pick.close();
+        openImport();
+      },
+    }),
+  );
   pick.showModal();
 }
 
@@ -358,30 +504,50 @@ const EXPORT_STEPS: [name: string, url: string, viaMenu: boolean][] = [
 
 function openImport(): void {
   const errEl = el("p", { className: "err", role: "alert" });
-  const choose = el("button", { type: "button", className: "primary", textContent: tr("import.choose"), onclick: async () => {
-    errEl.textContent = "";
-    const file = await window.__TAURI__.dialog.open({ multiple: false, directory: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
-    if (typeof file !== "string") return;
-    choose.disabled = true;
-    try {
-      const res = await kv("importCsv", { path: file });
-      await load();
-      importDone(res);
-    } catch (err) {
-      errEl.textContent = message(err);
-      choose.disabled = false;
-    }
-  } });
-  dlg().replaceChildren(el("div", { className: "fields-wrap" },
-    el("h2", { textContent: tr("import.title") }),
-    el("p", { className: "muted", textContent: tr("import.lead") }),
-    el("ol", { className: "steps" }, ...EXPORT_STEPS.map(([name, url, viaMenu]) =>
-      el("li", {}, el("strong", { textContent: name }), " — ", el("code", { dir: "ltr", textContent: url }), ` → ${viaMenu ? "⋯ → " : ""}${tr("import.export")}`))),
-    el("p", { className: "muted", textContent: tr("import.also") }),
-    errEl,
-    el("div", { className: "actions" },
-      el("button", { type: "button", textContent: tr("cancel"), onclick: () => dlg().close() }),
-      choose)));
+  const choose = el("button", {
+    type: "button",
+    className: "primary",
+    textContent: tr("import.choose"),
+    onclick: async () => {
+      errEl.textContent = "";
+      const file = await window.__TAURI__.dialog.open({ multiple: false, directory: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
+      if (typeof file !== "string") return;
+      choose.disabled = true;
+      try {
+        const res = await kv("importCsv", { path: file });
+        await load();
+        importDone(res);
+      } catch (err) {
+        errEl.textContent = message(err);
+        choose.disabled = false;
+      }
+    },
+  });
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("import.title") }),
+      el("p", { className: "muted", textContent: tr("import.lead") }),
+      el(
+        "ol",
+        { className: "steps" },
+        ...EXPORT_STEPS.map(([name, url, viaMenu]) =>
+          el(
+            "li",
+            {},
+            el("strong", { textContent: name }),
+            " — ",
+            el("code", { dir: "ltr", textContent: url }),
+            ` → ${viaMenu ? "⋯ → " : ""}${tr("import.export")}`,
+          ),
+        ),
+      ),
+      el("p", { className: "muted", textContent: tr("import.also") }),
+      errEl,
+      el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("cancel"), onclick: () => dlg().close() }), choose),
+    ),
+  );
   if (!dlg().open) dlg().showModal();
 }
 
@@ -389,18 +555,26 @@ function importDone(res: ImportResult): void {
   const parts = [tr("import.added", { n: res.added })];
   if (res.duplicates) parts.push(tr("import.duplicates", { n: res.duplicates }));
   if (res.skipped) parts.push(tr("import.skipped", { n: res.skipped }));
-  const del = el("button", { type: "button", className: "primary", textContent: tr("import.deleteFile"), onclick: safe(async () => {
-    await kv("importCleanup");
-    dlg().close();
-    toast(tr("import.fileDeleted"));
-  }) });
-  dlg().replaceChildren(el("div", { className: "fields-wrap" },
-    el("h2", { textContent: tr("import.done") }),
-    el("p", { id: "importResult", textContent: parts.join(" · ") }),
-    el("p", { className: "muted" }, tr("import.plainBefore"), el("code", { dir: "ltr", textContent: res.file }), tr("import.plainAfter")),
-    el("div", { className: "actions" },
-      el("button", { type: "button", textContent: tr("import.keep"), onclick: () => dlg().close() }),
-      del)));
+  const del = el("button", {
+    type: "button",
+    className: "primary",
+    textContent: tr("import.deleteFile"),
+    onclick: safe(async () => {
+      await kv("importCleanup");
+      dlg().close();
+      toast(tr("import.fileDeleted"));
+    }),
+  });
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("import.done") }),
+      el("p", { id: "importResult", textContent: parts.join(" · ") }),
+      el("p", { className: "muted" }, tr("import.plainBefore"), el("code", { dir: "ltr", textContent: res.file }), tr("import.plainAfter")),
+      el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("import.keep"), onclick: () => dlg().close() }), del),
+    ),
+  );
   cat = "login";
   render();
 }

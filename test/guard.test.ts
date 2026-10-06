@@ -23,7 +23,12 @@ const vault: VaultData = {
 };
 
 test("secretsOf: dev keys in every environment and secret item fields; short values skipped", () => {
-  assert.deepEqual(secretsOf(vault).map((s) => s.name).sort(), ["GitHub · Password", "web/API_KEY", "web/API_KEY (prod)"]);
+  assert.deepEqual(
+    secretsOf(vault)
+      .map((s) => s.name)
+      .sort(),
+    ["GitHub · Password", "web/API_KEY", "web/API_KEY (prod)"],
+  );
 });
 
 test("addedLines: file and new line numbers from a unified diff", () => {
@@ -55,7 +60,10 @@ test("findLeaks: reports file, line and name — never the value", () => {
     { file: ".env", line: 2, text: "PASSWORD=correct-horse-battery" },
     { file: "server.ts", line: 1, text: "listen(8080)" },
   ]);
-  assert.deepEqual(found, [{ file: "config.ts", line: 7, name: "web/API_KEY" }, { file: ".env", line: 2, name: "GitHub · Password" }]);
+  assert.deepEqual(found, [
+    { file: "config.ts", line: 7, name: "web/API_KEY" },
+    { file: ".env", line: 2, name: "GitHub · Password" },
+  ]);
   assert.ok(!JSON.stringify(found).includes("sk_live"), "no values in findings");
 });
 
@@ -86,23 +94,38 @@ test("scan: .env files, templates, key files; what's already in the vault; track
   execFileSync("git", ["add", ".env.example"], { cwd: app });
 
   const found = scan(root, vault);
-  assert.deepEqual(found.map((f) => [path.relative(root, f.file), f.kind, f.tracked]), [
-    [path.join("app", ".env"), "env", false],
-    [path.join("app", ".env.example"), "template", true],
-    [path.join("app", "id_ed25519"), "ssh-private-key", false],
-  ], "node_modules skipped; a certificate is not a secret");
+  assert.deepEqual(
+    found.map((f) => [path.relative(root, f.file), f.kind, f.tracked]),
+    [
+      [path.join("app", ".env"), "env", false],
+      [path.join("app", ".env.example"), "template", true],
+      [path.join("app", "id_ed25519"), "ssh-private-key", false],
+    ],
+    "node_modules skipped; a certificate is not a secret",
+  );
   const env = found[0]!.vars!;
-  assert.deepEqual(env.map((v) => [v.name, v.filled, v.inVault ?? null]), [["API_KEY", true, "web/API_KEY"], ["NEW_SECRET", true, null], ["PORT", false, null]]);
+  assert.deepEqual(
+    env.map((v) => [v.name, v.filled, v.inVault ?? null]),
+    [
+      ["API_KEY", true, "web/API_KEY"],
+      ["NEW_SECRET", true, null],
+      ["PORT", false, null],
+    ],
+  );
   assert.ok(!JSON.stringify(found).includes("not-in-vault-yet"), "no values in the scan result");
 });
 
-test("kv guard stops a commit with a vault value (Windows: unlocks through DPAPI remember-me)", { skip: process.platform !== "win32" && "unlocks through DPAPI remember-me" }, async () => {
+test("kv guard stops a commit with a vault value (Windows: unlocks through DPAPI remember-me)", {
+  skip: process.platform !== "win32" && "unlocks through DPAPI remember-me",
+}, async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "kv-guard-home-"));
   const setup = `import * as s from "./src/store.ts"; import * as r from "./src/remember.ts";
     const { key, data } = await s.create("guard pw");
     s.setEntry(data, "web", "API_KEY", "sk_live_0123456789");
     await s.save(key, data); await r.remember(key, s.salt());`;
-  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], { env: { ...process.env, KV_HOME: home } });
+  execFileSync(process.execPath, ["--experimental-strip-types", "--no-warnings=ExperimentalWarning", "--input-type=module", "-e", setup], {
+    env: { ...process.env, KV_HOME: home },
+  });
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "kv-guard-cli-"));
   execFileSync("git", ["init", "-q"], { cwd: repo });
   fs.writeFileSync(path.join(repo, "ok.ts"), "export const x = 1;\n");

@@ -26,5 +26,3 @@ declare global {
     "kv-lang": CustomEvent<Lang>;
   }
 }
-
-export {};

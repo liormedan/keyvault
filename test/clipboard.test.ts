@@ -19,10 +19,10 @@ test("copy works, is private on Windows (no history, no cloud sync) and clears i
   copyWithClear("clipboard-test-value-שלום", 2);
   assert.equal(paste(), "clipboard-test-value-שלום");
   if (windows) {
-  const formats = ps("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetDataObject().GetFormats() -join ','");
-  for (const f of ["ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]) {
-    assert.ok(formats.includes(f), `${f} missing — the value would land in clipboard history`);
-  }
+    const formats = ps("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetDataObject().GetFormats() -join ','");
+    for (const f of ["ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]) {
+      assert.ok(formats.includes(f), `${f} missing — the value would land in clipboard history`);
+    }
   }
   // the clear starts a fresh PowerShell: allow for a slow start on CI
   for (let i = 0; i < 30 && !fs.existsSync(log); i++) await new Promise((r) => setTimeout(r, 1000));

@@ -3,13 +3,23 @@
 (() => {
   const KEY = "kv-theme";
   const root = document.documentElement;
-  const read = (): "light" | "dark" => { try { return localStorage.getItem(KEY) === "light" ? "light" : "dark"; } catch { return "dark"; } };
+  const read = (): "light" | "dark" => {
+    try {
+      return localStorage.getItem(KEY) === "light" ? "light" : "dark";
+    } catch {
+      return "dark";
+    }
+  };
 
   function apply(theme: "light" | "dark"): void {
     if (theme === "light") root.dataset.theme = "light";
     else delete root.dataset.theme;
-    for (const b of document.querySelectorAll(".theme-toggle")) b.textContent = window.I18N ? window.I18N.tr(theme === "light" ? "theme.dark" : "theme.light") : "";
-    window.__TAURI__?.window.getCurrentWindow().setTheme(theme).catch(() => {}); // Windows title bar
+    for (const b of document.querySelectorAll(".theme-toggle"))
+      b.textContent = window.I18N ? window.I18N.tr(theme === "light" ? "theme.dark" : "theme.light") : "";
+    window.__TAURI__?.window
+      .getCurrentWindow()
+      .setTheme(theme)
+      .catch(() => {}); // Windows title bar
   }
 
   apply(read());
@@ -19,7 +29,9 @@
     for (const b of document.querySelectorAll(".theme-toggle")) {
       b.addEventListener("click", () => {
         const next = read() === "light" ? "dark" : "light";
-        try { localStorage.setItem(KEY, next); } catch {}
+        try {
+          localStorage.setItem(KEY, next);
+        } catch {}
         apply(next);
       });
     }

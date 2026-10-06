@@ -40,7 +40,10 @@ const str = (v: unknown) => String(v ?? "").trim();
 // Params arrive as JSON from the window, so values are still coerced with str() / String() at runtime.
 const methods = {
   // The window decides the language and tells the backend, so errors come back in the same language
-  setLang: ({ lang }) => (setLang(String(lang)), { lang: getLang() }),
+  setLang: ({ lang }) => {
+    setLang(String(lang));
+    return { lang: getLang() };
+  },
 
   status: () => ({
     exists: store.exists(),
@@ -73,8 +76,14 @@ const methods = {
     return { ok: true as const };
   },
 
-  lock: () => (lock(), { ok: true as const }),
-  forget: async () => (await remember.forget(), { ok: true as const }),
+  lock: () => {
+    lock();
+    return { ok: true as const };
+  },
+  forget: async () => {
+    await remember.forget();
+    return { ok: true as const };
+  },
 
   list: () => ({ projects: store.listing(need().data) }),
 

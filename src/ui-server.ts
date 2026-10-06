@@ -111,7 +111,8 @@ export function startUi({ key, data }: store.Session): Promise<string> {
       // The token is in the fragment (#) — never sent to the server or logged in request history
       const url = `http://127.0.0.1:${port}/#${token}`;
       process.stderr.write(`${t("ui.open", { url })}\n`);
-      if (process.platform === "win32" && !process.env.KV_NO_OPEN) spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+      if (process.platform === "win32" && !process.env.KV_NO_OPEN)
+        spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore", windowsHide: true }).unref();
       bump();
       process.on("SIGINT", () => shutdown(t("ui.closed")));
       resolve(url);

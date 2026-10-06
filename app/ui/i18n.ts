@@ -31,26 +31,26 @@ const EN = {
   "dev.notePlaceholder": "What it's for",
   "dev.newValue": "New value",
   "dev.envTag": "Has its own value in this environment (set with kv set --env)",
-  "cancel": "Cancel",
-  "save": "Save",
-  "delete": "Delete",
-  "edit": "Edit",
-  "close": "Close",
-  "show": "Show",
-  "hide": "Hide",
-  "copy": "Copy",
-  "copyField": "Copy {field}",
-  "copied": "Copied — the clipboard clears in 20 seconds",
-  "saved": "Saved",
-  "deleted": "Deleted",
-  "locked": "The vault locked",
-  "confirmDelete": "Delete {name}?",
+  cancel: "Cancel",
+  save: "Save",
+  delete: "Delete",
+  edit: "Edit",
+  close: "Close",
+  show: "Show",
+  hide: "Hide",
+  copy: "Copy",
+  copyField: "Copy {field}",
+  copied: "Copied — the clipboard clears in 20 seconds",
+  saved: "Saved",
+  deleted: "Deleted",
+  locked: "The vault locked",
+  confirmDelete: "Delete {name}?",
   "cat.all": "All",
   "cat.fav": "Favorites",
   "cat.dev": "Dev keys",
   "empty.search": "No results",
   "empty.fav": "No favorites yet — star an item",
-  "empty.all": "Nothing here yet — click \"Add\"",
+  "empty.all": 'Nothing here yet — click "Add"',
   "fav.add": "Add to favorites",
   "fav.remove": "Remove from favorites",
   "fav.label": "Favorite",
@@ -58,9 +58,9 @@ const EN = {
   "item.addTitle": "Add — {type}",
   "item.editTitle": "Edit — {type}",
   "item.title": "Title",
-  "generate": "Generate password",
+  generate: "Generate password",
   "import.title": "Import passwords from a browser",
-  "import.lead": "Export a CSV file from your browser, then choose it here. Each row becomes a \"Login\" item.",
+  "import.lead": 'Export a CSV file from your browser, then choose it here. Each row becomes a "Login" item.',
   "import.export": "Export passwords",
   "import.also": "Also works with export files from Safari, 1Password, Bitwarden and LastPass.",
   "import.choose": "Choose CSV file",
@@ -74,7 +74,7 @@ const EN = {
   "import.deleteFile": "Delete the file",
   "import.fileDeleted": "The CSV file was deleted",
   "pw.mismatch": "Passwords don't match",
-  "forgotten": "Remember me removed — the master password will be required next time",
+  forgotten: "Remember me removed — the master password will be required next time",
   "theme.light": "Light mode",
   "theme.dark": "Dark mode",
   "lang.other": "עברית",
@@ -111,26 +111,26 @@ const HE: Record<UiKey, string> = {
   "dev.notePlaceholder": "למה זה משמש",
   "dev.newValue": "ערך חדש",
   "dev.envTag": "יש לו ערך משלו בסביבה הזו (נקבע ב-kv set --env)",
-  "cancel": "ביטול",
-  "save": "שמירה",
-  "delete": "מחיקה",
-  "edit": "עריכה",
-  "close": "סגירה",
-  "show": "הצג",
-  "hide": "הסתר",
-  "copy": "העתק",
-  "copyField": "העתק {field}",
-  "copied": "הועתק — הלוח יתנקה בעוד 20 שניות",
-  "saved": "נשמר",
-  "deleted": "נמחק",
-  "locked": "הכספת ננעלה",
-  "confirmDelete": "למחוק את {name}?",
+  cancel: "ביטול",
+  save: "שמירה",
+  delete: "מחיקה",
+  edit: "עריכה",
+  close: "סגירה",
+  show: "הצג",
+  hide: "הסתר",
+  copy: "העתק",
+  copyField: "העתק {field}",
+  copied: "הועתק — הלוח יתנקה בעוד 20 שניות",
+  saved: "נשמר",
+  deleted: "נמחק",
+  locked: "הכספת ננעלה",
+  confirmDelete: "למחוק את {name}?",
   "cat.all": "הכול",
   "cat.fav": "מועדפים",
   "cat.dev": "מפתחות פיתוח",
   "empty.search": "אין תוצאות",
   "empty.fav": "אין מועדפים — סמן כוכב ליד פריט",
-  "empty.all": "אין כאן עדיין כלום — לחץ \"הוספה\"",
+  "empty.all": 'אין כאן עדיין כלום — לחץ "הוספה"',
   "fav.add": "הוסף למועדפים",
   "fav.remove": "הסר ממועדפים",
   "fav.label": "מועדף",
@@ -138,9 +138,9 @@ const HE: Record<UiKey, string> = {
   "item.addTitle": "הוספה — {type}",
   "item.editTitle": "עריכה — {type}",
   "item.title": "כותרת",
-  "generate": "צור סיסמה",
+  generate: "צור סיסמה",
   "import.title": "ייבוא סיסמאות מדפדפן",
-  "import.lead": "מייצאים בדפדפן קובץ CSV, ובוחרים אותו כאן. כל שורה הופכת לפריט \"התחברות לאתר\".",
+  "import.lead": 'מייצאים בדפדפן קובץ CSV, ובוחרים אותו כאן. כל שורה הופכת לפריט "התחברות לאתר".',
   "import.export": "ייצוא סיסמאות",
   "import.also": "מתאים גם לקובצי ייצוא של Safari, 1Password, Bitwarden ו-LastPass.",
   "import.choose": "בחירת קובץ CSV",
@@ -154,7 +154,7 @@ const HE: Record<UiKey, string> = {
   "import.deleteFile": "מחיקת הקובץ",
   "import.fileDeleted": "קובץ ה-CSV נמחק",
   "pw.mismatch": "הסיסמאות לא תואמות",
-  "forgotten": "הזכירה בוטלה — בפעם הבאה תידרש סיסמת אב",
+  forgotten: "הזכירה בוטלה — בפעם הבאה תידרש סיסמת אב",
   "theme.light": "מצב בהיר",
   "theme.dark": "מצב כהה",
   "lang.other": "English",
@@ -164,15 +164,20 @@ const M: Record<Lang, Record<UiKey, string>> = { en: EN, he: HE };
 const KEY = "kv-lang";
 
 (() => {
-
-  const read = (): Lang => { try { return localStorage.getItem(KEY) === "he" ? "he" : "en"; } catch { return "en"; } };
+  const read = (): Lang => {
+    try {
+      return localStorage.getItem(KEY) === "he" ? "he" : "en";
+    } catch {
+      return "en";
+    }
+  };
   let lang: Lang = read();
   const root = document.documentElement;
 
   const tr = (key: UiKey, params: Record<string, string | number> = {}): string =>
     M[lang][key].replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m));
   // { en, he } labels from src/types.js
-  const L = (v: Label | string | undefined): string => (v && typeof v === "object" ? v[lang] ?? v.en : v ?? "");
+  const L = (v: Label | string | undefined): string => (v && typeof v === "object" ? (v[lang] ?? v.en) : (v ?? ""));
 
   function applyStatic(): void {
     root.lang = lang;
@@ -182,12 +187,17 @@ const KEY = "kv-lang";
     for (const e of document.querySelectorAll<HTMLInputElement>("[data-i18n-placeholder]")) e.placeholder = tr(e.dataset.i18nPlaceholder as UiKey);
     for (const e of document.querySelectorAll<HTMLElement>("[data-i18n-aria]")) e.setAttribute("aria-label", tr(e.dataset.i18nAria as UiKey));
     for (const b of document.querySelectorAll(".lang-toggle")) b.textContent = tr("lang.other");
-    window.__TAURI__?.window.getCurrentWindow().setTitle(tr("app.title")).catch(() => {});
+    window.__TAURI__?.window
+      .getCurrentWindow()
+      .setTitle(tr("app.title"))
+      .catch(() => {});
   }
 
   function set(l: Lang): void {
     lang = l === "he" ? "he" : "en";
-    try { localStorage.setItem(KEY, lang); } catch {}
+    try {
+      localStorage.setItem(KEY, lang);
+    } catch {}
     applyStatic();
     document.dispatchEvent(new CustomEvent("kv-lang", { detail: lang }));
   }

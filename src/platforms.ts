@@ -22,7 +22,7 @@ export type Runner = (cmd: string, args: string[], opts: { input?: string; cwd?:
 
 const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // names, targets, repo names — and our own temp-file paths (drive letters, backslashes, spaces in a user folder)
-const SAFE_ARG = /^[A-Za-z0-9._\/:\\ ()~-]+$/; // ~ for 8.3 short paths (C:\Users\RUNNER~1\…)
+const SAFE_ARG = /^[A-Za-z0-9._/:\\ ()~-]+$/; // ~ for 8.3 short paths (C:\Users\RUNNER~1\…)
 const WINDOWS = process.platform === "win32";
 
 export const runTool: Runner = (cmd, args, { input, cwd }) => {
@@ -83,7 +83,12 @@ export function push(platform: Platform, values: Record<string, string>, opts: P
 }
 
 /** Vercel's values for a target, through `vercel env pull` into a private temp file that is deleted at once */
-export function pullVercel(target: VercelTarget, cwd: string | undefined, parseEnv: (text: string) => Record<string, string>, run: Runner = runTool): Record<string, string> {
+export function pullVercel(
+  target: VercelTarget,
+  cwd: string | undefined,
+  parseEnv: (text: string) => Record<string, string>,
+  run: Runner = runTool,
+): Record<string, string> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kv-pull-"));
   const file = path.join(dir, "vercel.env");
   try {
@@ -100,7 +105,11 @@ export function pullVercel(target: VercelTarget, cwd: string | undefined, parseE
 
 /** GitHub secrets can't be read back — names only */
 export function githubSecretNames(opts: { repo?: string; environment?: string; cwd?: string }, run: Runner = runTool): string[] {
-  const r = run("gh", ["secret", "list", "--json", "name", ...(opts.repo ? ["--repo", opts.repo] : []), ...(opts.environment ? ["--env", opts.environment] : [])], { cwd: opts.cwd });
+  const r = run(
+    "gh",
+    ["secret", "list", "--json", "name", ...(opts.repo ? ["--repo", opts.repo] : []), ...(opts.environment ? ["--env", opts.environment] : [])],
+    { cwd: opts.cwd },
+  );
   if (r.status !== 0) fail("gh", r);
   return (JSON.parse(r.stdout || "[]") as { name: string }[]).map((s) => s.name).sort();
 }

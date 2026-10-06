@@ -120,17 +120,24 @@ const host = (url: string): string => {
 export function subtitle(item: Pick<Item, "type" | "fields">): string {
   const f = item.fields || {};
   switch (item.type) {
-    case "login": return [f.username, f.url && host(f.url)].filter(Boolean).join(" · ");
+    case "login":
+      return [f.username, f.url && host(f.url)].filter(Boolean).join(" · ");
     case "card": {
       const digits = String(f.number || "").replace(/\D/g, "");
       return [f.issuer, digits.length >= 4 && `•••• ${digits.slice(-4)}`, f.expiry].filter(Boolean).join(" · ");
     }
-    case "bank": return [f.bank, f.branch && `${fieldDef("bank", "branch")?.label[getLang()]} ${f.branch}`].filter(Boolean).join(" · ");
-    case "identity": return f.fullName || "";
-    case "wifi": return f.ssid || "";
-    case "server": return f.host ? `${f.username ? `${f.username}@` : ""}${f.host}${f.port ? `:${f.port}` : ""}` : "";
-    case "license": return [f.product, f.version].filter(Boolean).join(" ");
-    default: return "";
+    case "bank":
+      return [f.bank, f.branch && `${fieldDef("bank", "branch")?.label[getLang()]} ${f.branch}`].filter(Boolean).join(" · ");
+    case "identity":
+      return f.fullName || "";
+    case "wifi":
+      return f.ssid || "";
+    case "server":
+      return f.host ? `${f.username ? `${f.username}@` : ""}${f.host}${f.port ? `:${f.port}` : ""}` : "";
+    case "license":
+      return [f.product, f.version].filter(Boolean).join(" ");
+    default:
+      return "";
   }
 }
 

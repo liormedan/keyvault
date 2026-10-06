@@ -165,7 +165,9 @@ const commands: Record<string, () => Promise<void>> = {
     const only = args.shift();
     const { data } = await unlock();
     const list = store.listing(data);
-    const names = Object.keys(list).filter((p) => !only || p === only).sort();
+    const names = Object.keys(list)
+      .filter((p) => !only || p === only)
+      .sort();
     if (asJson) {
       // names and notes only — never values
       console.log(JSON.stringify(Object.fromEntries(names.map((p) => [p, list[p]])), null, 2));
@@ -307,7 +309,12 @@ const commands: Record<string, () => Promise<void>> = {
     const { data } = await unlock();
     const keys = data.projects[project];
     if (!keys) throw new Error(t("cli.noProject", { name: project }));
-    process.stdout.write(Object.keys(keys).sort().map((k) => `${k}=`).join("\n") + "\n");
+    process.stdout.write(
+      Object.keys(keys)
+        .sort()
+        .map((k) => `${k}=`)
+        .join("\n") + "\n",
+    );
   },
 
   async check() {
@@ -474,7 +481,9 @@ const commands: Record<string, () => Promise<void>> = {
     const warn = (s: string) => console.log(`  ! ${s}`);
     console.log(t("doctor.title"));
     const [maj, min] = process.versions.node.split(".").map(Number) as [number, number];
-    (maj > 22 || (maj === 22 && min >= 6) ? ok : warn)(t(maj > 22 || (maj === 22 && min >= 6) ? "doctor.node" : "doctor.nodeOld", { version: process.versions.node }));
+    (maj > 22 || (maj === 22 && min >= 6) ? ok : warn)(
+      t(maj > 22 || (maj === 22 && min >= 6) ? "doctor.node" : "doctor.nodeOld", { version: process.versions.node }),
+    );
     if (!store.exists()) return void warn(t("doctor.noVault"));
     ok(t("doctor.vault", { path: store.VAULT }));
     if (process.platform !== "win32") {
@@ -483,7 +492,12 @@ const commands: Record<string, () => Promise<void>> = {
     }
     (remember.remembered() ? ok : warn)(t(remember.remembered() ? "doctor.remembered" : "doctor.notRemembered"));
     const backupDir = process.env.KV_BACKUP_DIR || path.join(store.HOME, "backups");
-    const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir).filter((f) => /^vault_.*\.kv$/.test(f)).sort() : [];
+    const backups = fs.existsSync(backupDir)
+      ? fs
+          .readdirSync(backupDir)
+          .filter((f) => /^vault_.*\.kv$/.test(f))
+          .sort()
+      : [];
     if (!backups.length) warn(t("doctor.noBackup", { dir: backupDir }));
     else {
       const last = path.join(backupDir, backups[backups.length - 1]!);
@@ -498,7 +512,11 @@ const commands: Record<string, () => Promise<void>> = {
     (hookInstalled() ? ok : warn)(t(hookInstalled() ? "doctor.guard" : "doctor.noGuard"));
     if (session) {
       const yearAgo = Date.now() - 365 * 86_400_000;
-      const stale = Object.entries(session.data.projects).flatMap(([p, keys]) => Object.entries(keys).filter(([, e]) => Date.parse(e.updated) < yearAgo).map(([k]) => `${p}/${k}`));
+      const stale = Object.entries(session.data.projects).flatMap(([p, keys]) =>
+        Object.entries(keys)
+          .filter(([, e]) => Date.parse(e.updated) < yearAgo)
+          .map(([k]) => `${p}/${k}`),
+      );
       if (stale.length) warn(t("doctor.stale", { n: stale.length, names: stale.slice(0, 8).join(", ") + (stale.length > 8 ? ", …" : "") }));
     }
   },

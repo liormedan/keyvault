@@ -11,6 +11,7 @@ const BACKEND = fileURLToPath(new URL("../src/backend.ts", import.meta.url));
 const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 
 /** A raw reply, loosely typed on purpose: tests also send invalid requests. `error` is undefined on success. */
+// biome-ignore lint/suspicious/noExplicitAny: tests also send invalid requests and read any result shape
 export type TestReply = { id: number | null; result?: any; error: string };
 
 /** A backend process that stays up; `call` sends one request and waits for its reply */
@@ -37,7 +38,15 @@ export function runBackendBatch(home: string, requests: { id: number; method: st
     const child = spawn(process.execPath, [...NODE_TS, BACKEND], { env: { ...process.env, KV_HOME: home }, stdio: ["pipe", "pipe", "ignore"] });
     let out = "";
     child.stdout.on("data", (c: Buffer) => (out += c));
-    child.on("exit", () => resolve(out.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as TestReply)));
+    child.on("exit", () =>
+      resolve(
+        out
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => JSON.parse(l) as TestReply),
+      ),
+    );
     child.stdin.end(requests.map((r) => JSON.stringify(r)).join("\n") + "\n");
   });
 }
@@ -45,7 +54,10 @@ export function runBackendBatch(home: string, requests: { id: number; method: st
 /** Run `kv <args>`; resolves with stdout and stderr together */
 export function runCli(home: string, args: string[], env: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve) => {
-    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], { env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], {
+      env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let out = "";
     c.stdout.on("data", (d: Buffer) => (out += d));
     c.stderr.on("data", (d: Buffer) => (out += d));
@@ -54,9 +66,18 @@ export function runCli(home: string, args: string[], env: Record<string, string>
 }
 
 /** Like runCli, but also the exit code, and stdout separately (for --json) */
-export function runCliFull(home: string, args: string[], env: Record<string, string> = {}, cwd?: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
+export function runCliFull(
+  home: string,
+  args: string[],
+  env: Record<string, string> = {},
+  cwd?: string,
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], { cwd, env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    const c = spawn(process.execPath, [...NODE_TS, CLI, ...args], {
+      cwd,
+      env: { ...process.env, KV_HOME: home, KV_LANG: "", ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     c.stdout.on("data", (d: Buffer) => (stdout += d));

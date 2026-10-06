@@ -6,7 +6,20 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { deriveKey, newKdfParams, open, seal } from "./crypto.ts";
 import { t } from "./i18n.ts";
-import type { DevEntry, Fields, ImportedLogin, Item, ItemTypeName, ListedDevKey, ListedItem, MaskedField, MaskedItem, VaultData, VaultFile, VaultHeader } from "./model.ts";
+import type {
+  DevEntry,
+  Fields,
+  ImportedLogin,
+  Item,
+  ItemTypeName,
+  ListedDevKey,
+  ListedItem,
+  MaskedField,
+  MaskedItem,
+  VaultData,
+  VaultFile,
+  VaultHeader,
+} from "./model.ts";
 import { TYPES, subtitle } from "./types.ts";
 
 export interface Session {
@@ -232,12 +245,19 @@ export function deleteItem(data: VaultData, id: string): void {
 // (same URL, username and password) is skipped. Returns counts only.
 export function importLogins(data: VaultData, logins: ImportedLogin[]): { added: number; duplicates: number } {
   const sig = (f: Fields) => `${f.url || ""}\n${f.username || ""}\n${f.password || ""}`;
-  const seen = new Set(Object.values(data.items).filter((it) => it.type === "login").map((it) => sig(it.fields)));
+  const seen = new Set(
+    Object.values(data.items)
+      .filter((it) => it.type === "login")
+      .map((it) => sig(it.fields)),
+  );
   let added = 0;
   let duplicates = 0;
   for (const l of logins) {
     const key = sig(l.fields);
-    if (seen.has(key)) { duplicates++; continue; }
+    if (seen.has(key)) {
+      duplicates++;
+      continue;
+    }
     saveItem(data, { type: "login", title: l.title, fields: l.fields });
     seen.add(key);
     added++;

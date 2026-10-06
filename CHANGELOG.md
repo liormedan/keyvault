@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.0 — 2026-10-06
+
+### Added
+
+- **[docs/CLI.md](docs/CLI.md)** — the complete command reference: commands, flags, exit codes, environment variables and every `--json` shape. The interface 1.0 will commit to.
+- **Docs for contributors:** [CONTRIBUTING.md](CONTRIBUTING.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (with a diagram and the threat model), and [docs/FORMAT.md](docs/FORMAT.md) — the vault file format, precise enough to write an independent reader. A test does exactly that: it opens the 0.1 fixture using only libsodium and the document.
+- Issue and PR templates; security reports go to GitHub's private advisories.
+- A terminal demo in the README, generated from the real CLI by `scripts/demo-svg.mjs`.
+- `npm run release -- <x.y.z>` sets the version in all four places and dates the changelog.
+
+### Changed
+
+- **Biome** for lint and format, in CI. Lint findings were fixed in the code rather than switched off.
+- **Coverage** in CI (Ubuntu) with a threshold of 75% of lines (measured on Linux, where Windows-only code paths are not run), summarized on each run.
+- The window test runs in CI again, against a test-only build whose window config opens the DevTools port (`tauri.e2e.conf.json` — never used for releases).
+
+### Fixed
+
+- File-system races CodeQL flagged in `kv guard` and `kv scan`: files are now checked and read (or written) through one handle.
+- **The desktop app couldn't start its backend from a verbatim Windows path** (`\\?\D:\…`, which Tauri can return): Node failed with `EISDIR: lstat 'D:'` and the window showed "locked". Found by the window test on GitHub's runner. The prefix is now dropped for drive paths, and `KV_BACKEND_LOG` lets a test collect the backend's startup errors.
+
 ## 0.6.0 — unreleased
 
 ### Added
