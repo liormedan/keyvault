@@ -52,19 +52,26 @@ export const WIN_PRIVATE_COPY =
   "$d.SetData('CanUploadToCloudClipboard', (& $z)); " +
   "[System.Windows.Forms.Clipboard]::SetDataObject($d, $true)";
 
+// Reads the clipboard and clears it if it still holds the text with this SHA-256. Prints what it did.
+const WIN_CLEAR_IF = (hash: string) =>
+  "Add-Type -AssemblyName System.Windows.Forms; $c = [System.Windows.Forms.Clipboard]::GetText(); if ($c) { " +
+  "$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c))).Replace('-','').ToLower(); " +
+  `if ($h -eq '${hash}') { [System.Windows.Forms.Clipboard]::Clear(); 'cleared' } else { 'changed since - left alone' } } else { 'empty' }`;
+
 // Copies to the clipboard and clears it after `seconds` — only if it still holds the same value (compares a hash, not the value).
-// The clear runs in a detached PowerShell so it outlives `kv copy`. KV_CLIPBOARD_LOG (tests) records what it did.
+// The clear must outlive `kv copy`, so it runs in a detached Node process. (A detached PowerShell doesn't start at
+// all on Windows, and a non-detached child dies with its parent.) Only the hash crosses the command line.
+// KV_CLIPBOARD_LOG (tests) records what the clear did.
 export function copyWithClear(value: string, seconds: number = 20): void {
   execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", WIN_PRIVATE_COPY], { input: value, windowsHide: true });
-  const log = process.env.KV_CLIPBOARD_LOG ? ` *> '${process.env.KV_CLIPBOARD_LOG.replace(/'/g, "''")}'` : "";
-  const script =
-    `& { Start-Sleep -Seconds ${seconds}; Add-Type -AssemblyName System.Windows.Forms; ` +
-    `$c = [System.Windows.Forms.Clipboard]::GetText(); if ($c) { ` +
-    `$h = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($c))).Replace('-','').ToLower(); ` +
-    `if ($h -eq '${sha(value)}') { [System.Windows.Forms.Clipboard]::Clear(); 'cleared' } else { 'changed since — left alone' } } else { 'empty' } }${log}`;
-  spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-Command", script], {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
-  }).unref();
+  const clear = [
+    `const { execFileSync } = require("node:child_process");`,
+    `setTimeout(() => {`,
+    `  let out;`,
+    `  try { out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ${JSON.stringify(WIN_CLEAR_IF(sha(value)))}], { encoding: "utf8", windowsHide: true }).trim(); }`,
+    `  catch (e) { out = "failed: " + e.message; }`,
+    `  if (process.env.KV_CLIPBOARD_LOG) require("node:fs").writeFileSync(process.env.KV_CLIPBOARD_LOG, out);`,
+    `}, ${Math.max(0, Math.floor(seconds)) * 1000});`,
+  ].join(";");
+  spawn(process.execPath, ["-e", clear], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
