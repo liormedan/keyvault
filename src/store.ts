@@ -281,13 +281,15 @@ export function importItems(data: VaultData, incoming: ImportedItem[]): { added:
 
 export async function exportTo(file: string, data: VaultData, password: string): Promise<void> {
   if (!password) throw new Error(t("pw.empty"));
-  if (fs.existsSync(file)) throw new Error(t("export.exists", { path: file }));
   const header: VaultHeader = { v: 1, kdf: await newKdfParams() };
   const key = await deriveKey(password, header.kdf);
   try {
     const sealed = await seal(key, data, header);
-    // wx: never overwrite, even if the file appeared since the check above
+    // wx: create only — an existing file is never overwritten (no separate exists check to race with)
     fs.writeFileSync(file, JSON.stringify(sealed, null, 1), { mode: 0o600, flag: "wx" });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(t("export.exists", { path: file }));
+    throw e;
   } finally {
     await wipe(key);
   }

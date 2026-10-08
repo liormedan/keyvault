@@ -1,6 +1,5 @@
 // Password health: reused, weak and old passwords, and logins without two-factor.
 // Computed in memory from the open vault; the report carries listed items (names) only, never a value.
-import { createHash } from "node:crypto";
 import type { HealthReport, Item, ItemTypeName, ListedItem, VaultData, Weakness } from "./model.ts";
 import { listItems } from "./store.ts";
 
@@ -40,9 +39,8 @@ export function healthReport(data: VaultData, now: number = Date.now()): HealthR
     if (!pw) continue;
     checked++;
     const l = listed.get(it.id)!;
-    // Grouped by a hash so the map's keys aren't the passwords themselves
-    const h = createHash("sha256").update(pw).digest("base64");
-    byPassword.set(h, [...(byPassword.get(h) ?? []), l]);
+    // Grouped by the password itself — in memory only, like the open vault it comes from
+    byPassword.set(pw, [...(byPassword.get(pw) ?? []), l]);
     const reason = weakness(pw);
     if (reason) weak.push({ item: l, reason });
     if (now - Date.parse(it.updated) > YEAR_MS) old.push(l);

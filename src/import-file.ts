@@ -354,14 +354,20 @@ export function parseImport(buf: Buffer): ImportParse {
   return { format: "CSV", items: logins, skipped };
 }
 
+// Checked and read through one handle, so the file can't be swapped between the check and the read
 export function readImportFile(file: string): ImportParse {
-  let st: fs.Stats;
+  let fd: number;
   try {
-    st = fs.statSync(file);
+    fd = fs.openSync(file, "r");
   } catch {
     throw new Error(t("import.notFound"));
   }
-  if (!st.isFile()) throw new Error(t("import.notFile"));
-  if (st.size > MAX_ZIP) throw new Error(t("import.tooBig"));
-  return parseImport(fs.readFileSync(file));
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) throw new Error(t("import.notFile"));
+    if (st.size > MAX_ZIP) throw new Error(t("import.tooBig"));
+    return parseImport(fs.readFileSync(fd));
+  } finally {
+    fs.closeSync(fd);
+  }
 }
