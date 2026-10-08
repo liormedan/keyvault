@@ -21,6 +21,9 @@ const base = {
   version,
   description: "Fill and save logins with kv-vault, your local encrypted vault. No account, no cloud.",
   permissions: ["nativeMessaging", "activeTab", "scripting", "storage"],
+  // The content script already runs on every http(s) page (to notice a submitted sign-in); declaring the same
+  // sites as host permissions lets the popup and the shortcut read the tab's URL to match logins
+  host_permissions: ["https://*/*", "http://*/*"],
   action: { default_popup: "popup.html", default_icon: { 32: "icon-32.png", 128: "icon-128.png" } },
   icons: { 32: "icon-32.png", 128: "icon-128.png" },
   content_scripts: [{ matches: ["https://*/*", "http://*/*"], js: ["content.js"], run_at: "document_idle" }],
@@ -31,7 +34,6 @@ const manifests = {
   firefox: {
     ...base,
     background: { scripts: ["background.js"] },
-    host_permissions: ["https://*/*", "http://*/*"],
     browser_specific_settings: { gecko: { id: firefoxId, strict_min_version: "128.0" } },
   },
 };
