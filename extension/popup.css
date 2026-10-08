@@ -1,0 +1,28 @@
+:root { color-scheme: dark; --bg:#14171d; --card:#1d222b; --ink:#e8e6e1; --muted:#9aa1ad; --line:#2c323d; --accent:#7fb8a4; --danger:#e08a7c; }
+@media (prefers-color-scheme: light) {
+  :root { color-scheme: light; --bg:#f6f4ef; --card:#fff; --ink:#1d2433; --muted:#6b7280; --line:#e5e1d8; --accent:#2f5d50; --danger:#a33a2c; }
+}
+* { box-sizing: border-box; }
+body { margin:0; width:340px; background:var(--bg); color:var(--ink); font: 14px/1.45 system-ui, "Segoe UI", Arial, sans-serif; }
+header { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); }
+header .host { margin-inline-start:auto; color:var(--muted); font-size:12px; direction:ltr; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:170px; }
+main { padding:10px 12px 12px; display:grid; gap:10px; }
+.muted { color:var(--muted); margin:0; font-size:13px; }
+.err { color:var(--danger); margin:0; font-size:13px; min-height:1.2em; }
+button { font:inherit; font-size:13px; border:1px solid var(--line); background:var(--card); color:inherit; border-radius:7px; padding:4px 10px; cursor:pointer; }
+button:hover { border-color:var(--accent); }
+button.primary { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+input { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:7px; padding:6px 8px; width:100%; }
+form { display:grid; gap:8px; }
+.list { display:grid; gap:6px; }
+.login { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:8px 10px; display:grid; gap:6px; }
+.login .who { display:grid; min-width:0; }
+.login .title { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.login .user { color:var(--muted); font-size:12px; direction:ltr; text-align:start; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row { display:flex; gap:6px; flex-wrap:wrap; }
+.save { border:1px dashed var(--accent); border-radius:9px; padding:8px 10px; display:grid; gap:6px; }
+.save .user { direction:ltr; font-size:12px; color:var(--muted); }
+footer { display:flex; gap:8px; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:8px; }
+.toast { color:var(--accent); font-size:12px; min-height:1.2em; margin:0; }
+code { font-family: ui-monospace, Consolas, monospace; font-size:12px; background:var(--card); padding:1px 5px; border-radius:5px; }

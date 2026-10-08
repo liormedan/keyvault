@@ -118,6 +118,11 @@ const EN = {
   "export.exists": "{path} already exists — choose another name",
   "export.notExport": "{path} is not a kv-vault export",
   "restore.exists": "A vault already exists at {path}. Use --force to replace it (the current one is kept as vault.kv.before-restore)",
+  "browser.noHost": "The browser host isn't built here (host.mjs / host.js missing). Run npm run build, or reinstall kv-vault.",
+  "browser.on": "Browser extension: on — registered with {browsers}.",
+  "browser.off": "Browser extension: off. Turn it on with: kv browser enable",
+  "browser.load": "Load the extension: chrome://extensions or edge://extensions → Developer mode → Load unpacked → {dir}",
+  "cli.usage.browser": "Usage: kv browser [status|enable|disable] [--json]",
   "weak.common": "very common",
   "weak.repeated": "one repeated character",
   "weak.short": "shorter than 8 characters",
@@ -153,6 +158,7 @@ const EN = {
   kv import <project> <file.env>   import an env file
   kv import-passwords <file> [--delete]   import from a browser CSV, 1Password, Bitwarden, KeePass or LastPass export
   kv audit [--breaches] [--json]   reused, weak and old passwords; --breaches: check known breaches (hash prefixes only)
+  kv browser [status|enable|disable]   connect the kv-vault browser extension (off until enabled)
   kv ui                            browser window to view, search and edit (local only)
   kv unlock --remember             remember the vault for this Windows user (no password each time)
   kv forget                        drop the remembered key
@@ -373,6 +379,11 @@ const HE: Record<MessageKey, string> = {
   "export.exists": "{path} כבר קיים — בחר שם אחר",
   "export.notExport": "{path} אינו קובץ ייצוא של kv-vault",
   "restore.exists": "כבר יש כספת ב-{path}. הוסף --force כדי להחליף אותה (הנוכחית תישמר בשם vault.kv.before-restore)",
+  "browser.noHost": "רכיב החיבור לדפדפן לא נבנה כאן (חסר host.mjs / host.js). הרץ npm run build, או התקן את kv-vault מחדש.",
+  "browser.on": "תוסף הדפדפן: פעיל — רשום ב-{browsers}.",
+  "browser.off": "תוסף הדפדפן: כבוי. להפעלה: kv browser enable",
+  "browser.load": "טעינת התוסף: chrome://extensions או edge://extensions ← מצב מפתח ← Load unpacked ← {dir}",
+  "cli.usage.browser": "שימוש: kv browser [status|enable|disable] [--json]",
   "weak.common": "נפוצה מאוד",
   "weak.repeated": "תו אחד שחוזר",
   "weak.short": "קצרה מ-8 תווים",
@@ -408,6 +419,7 @@ const HE: Record<MessageKey, string> = {
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
   kv import-passwords <קובץ> [--delete]   ייבוא מ-CSV של דפדפן, 1Password, ‏Bitwarden, ‏KeePass או LastPass
   kv audit [--breaches] [--json]   סיסמאות חוזרות, חלשות וישנות; ‎--breaches: בדיקת דליפות (רק תחילית של hash)
+  kv browser [status|enable|disable]   חיבור תוסף הדפדפן של kv-vault (כבוי עד שמפעילים)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)
   kv unlock --remember           זכירת הכספת למשתמש הזה ב-Windows (בלי להקליד סיסמה כל פעם)
   kv forget                      ביטול הזכירה

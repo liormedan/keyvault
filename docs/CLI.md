@@ -37,6 +37,7 @@ Everything below is the command line's public interface: commands, flags, exit c
 | `kv ls [project] [--json]` | `{ [project]: [{ key, note, updated, envs? }] }` |
 | `kv import <project> <file.env>` | import an env file (empty values skipped) |
 | `kv import-passwords <file> [--delete]` | a browser CSV, 1Password (`.1pux` or CSV), Bitwarden (unencrypted `.json`), KeePass (`.xml`) or LastPass export; the format is recognised from the content |
+| `kv browser [status\|enable\|disable] [--json]` | the browser extension's link to this computer: `{ enabled, registered: [browser], chromeId, firefoxId, chromeExtension, firefoxExtension }`. `enable` registers the native messaging host with Chrome, Edge, Chromium and Firefox; `disable` removes it |
 | `kv audit [--breaches] [--json]` | password health: `{ checked, reused: [[item]], weak: [{ item, reason }], old: [item], no2fa: [item], breaches?: { checked, found: [{ count, items }] } }`, where `item` is `{ id, type, title, sub, fav, updated }` and `reason` is `common`, `repeated`, `short`, `digits` or `letters`. `--breaches` is the only network call kv makes: the first 5 hex characters of each password's SHA-1 go to `api.pwnedpasswords.com` |
 
 ## Projects

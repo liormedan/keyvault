@@ -2,6 +2,7 @@
 // One JSON line per request on stdin, one per reply on stdout. Both sides type against this file,
 // so a wrong method name or a missing parameter fails at compile time instead of at runtime.
 import type { BreachReport, Fields, HealthReport, ItemTypeName, Lang, ListedDevKey, ListedItem, MaskedItem, TypeDef } from "./model.ts";
+import type { BrowserStatus } from "./browser-setup.ts";
 import type { TotpCode } from "./totp.ts";
 
 /** The error string for "the vault is locked" — the window shows the unlock screen on it */
@@ -74,6 +75,11 @@ export interface Methods {
   exportVault: { params: { path: string; password?: string }; result: { code?: string } };
 
   generate: { params: { length?: number; symbols?: boolean }; result: { value: string } };
+
+  // the browser extension's link to this computer — off until the user turns it on
+  browserStatus: { params: None; result: BrowserStatus };
+  browserEnable: { params: None; result: BrowserStatus };
+  browserDisable: { params: None; result: BrowserStatus };
 }
 
 export type Method = keyof Methods;

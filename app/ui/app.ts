@@ -2,6 +2,7 @@
 // typed against src/protocol.ts — the same contract the backend implements.
 // Secret fields reach the window only on reveal or edit; copy goes from the backend straight to the clipboard.
 import type { BreachReport, FieldDef, HealthReport, ItemTypeName, ListedDevKey as DevEntryRow, ListedItem, MaskedItem, TypeDef } from "../../src/model.ts";
+import type { BrowserStatus } from "../../src/browser-setup.ts";
 import type { ImportResult, Method, Params, Result, Status } from "../../src/protocol.ts";
 import { LOCKED } from "../../src/protocol.ts";
 
@@ -775,6 +776,87 @@ function importDone(res: ImportResult): void {
   render();
 }
 
+// ── Browser extension ──
+// Off until the user turns it on here; turning it on registers kv-vault's native messaging host with the browsers.
+
+function pathBox(dir: string): HTMLElement {
+  const copy = el("button", {
+    type: "button",
+    textContent: tr("browser.copyPath"),
+    onclick: async () => {
+      await navigator.clipboard.writeText(dir).then(
+        () => toast(tr("browser.copied")),
+        () => window.getSelection()?.selectAllChildren(code),
+      );
+    },
+  });
+  const code = el("code", { dir: "ltr", className: "path-box", textContent: dir });
+  return el("div", { className: "field-row" }, code, copy);
+}
+
+async function openBrowser(): Promise<void> {
+  let st: BrowserStatus;
+  try {
+    st = await kv("browserStatus");
+  } catch (e) {
+    toast(message(e));
+    return;
+  }
+  const render = (s: BrowserStatus) => {
+    const toggle = el("button", {
+      type: "button",
+      className: s.enabled ? "" : "primary",
+      textContent: tr(s.enabled ? "browser.turnOff" : "browser.turnOn"),
+      onclick: safe(async () => {
+        toggle.disabled = true;
+        render(await kv(s.enabled ? "browserDisable" : "browserEnable"));
+      }),
+    });
+    const state = s.enabled ? (s.registered.length ? tr("browser.on", { browsers: s.registered.join(", ") }) : tr("browser.onNone")) : tr("browser.off");
+    const steps: HTMLElement[] =
+      s.enabled && s.chromeExtension
+        ? [
+            el("p", { textContent: tr("browser.how") }),
+            el(
+              "ol",
+              { className: "steps" },
+              el(
+                "li",
+                {},
+                tr("browser.step1"),
+                " ",
+                el("code", { dir: "ltr", textContent: "chrome://extensions" }),
+                " · ",
+                el("code", { dir: "ltr", textContent: "edge://extensions" }),
+              ),
+              el("li", {}, tr("browser.step2"), pathBox(s.chromeExtension)),
+              el("li", { textContent: tr("browser.step3") }),
+            ),
+            ...(s.firefoxExtension ? [el("p", { className: "muted", textContent: tr("browser.firefox") }), pathBox(s.firefoxExtension)] : []),
+          ]
+        : [];
+    dlg().replaceChildren(
+      el(
+        "div",
+        { className: "fields-wrap" },
+        el("h2", { textContent: tr("browser.title") }),
+        el("p", { className: "muted", textContent: tr("browser.lead") }),
+        el("p", { className: "browser-state" }, el("span", { className: `chip${s.enabled ? " on" : ""}`, id: "browserState", textContent: state })),
+        ...steps,
+        el("p", { className: "muted", textContent: tr("browser.what") }),
+        el(
+          "div",
+          { className: "actions" },
+          toggle,
+          el("button", { type: "button", className: s.enabled ? "primary" : "", textContent: tr("close"), onclick: () => dlg().close() }),
+        ),
+      ),
+    );
+  };
+  render(st);
+  if (!dlg().open) dlg().showModal();
+}
+
 // ── Emergency export ──
 // An encrypted copy under its own password, or under a generated recovery code shown once.
 
@@ -946,6 +1028,7 @@ $("#lock").onclick = async () => {
 // Windows was locked (or the machine slept): the shell already locked the backend
 void window.__TAURI__.event.listen("kv-locked", () => void lockedView());
 $("#exportBtn").onclick = () => openExport();
+$("#browserBtn").onclick = () => void openBrowser();
 $("#forget").onclick = safe(async () => {
   await kv("forget");
   $("#forget").hidden = true;

@@ -57,3 +57,20 @@ jobs:
           name: e2e-screenshots
           path: test/e2e/out/
           if-no-files-found: ignore
+
+  # The browser extension in a real Chromium, talking to the native host. CI only: it registers the host for the
+  # runner's user (HKCU), which a local test must never do.
+  extension:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright-core install chromium
+      - run: npm run test:extension
+        env:
+          KV_TEST_BROWSER: "1"
