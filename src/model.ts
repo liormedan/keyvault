@@ -109,8 +109,32 @@ export interface MaskedItem extends Omit<Item, "fields"> {
   fields: Record<string, MaskedField>;
 }
 
-/** A login parsed from a browser export, before it becomes an item */
-export interface ImportedLogin {
+/** An item parsed from an export file (browser CSV, 1Password, Bitwarden, KeePass), before it becomes an item */
+export interface ImportedItem {
+  type: ItemTypeName;
   title: string;
   fields: Fields;
+}
+
+// ── Password health (src/health.ts, src/breach.ts) ──
+
+export type Weakness = "common" | "repeated" | "short" | "digits" | "letters";
+
+/** Names only: every entry is a listed item, never a value */
+export interface HealthReport {
+  /** passwords looked at (logins, bank, Wi-Fi and server passwords) */
+  checked: number;
+  /** groups of items sharing one password, largest first */
+  reused: ListedItem[][];
+  weak: { item: ListedItem; reason: Weakness }[];
+  /** password not changed for over a year (by the item's `updated`) */
+  old: ListedItem[];
+  /** logins without a two-factor key */
+  no2fa: ListedItem[];
+}
+
+export interface BreachReport {
+  checked: number;
+  /** passwords seen in known breaches, most-seen first, with every item that uses each */
+  found: { count: number; items: ListedItem[] }[];
 }

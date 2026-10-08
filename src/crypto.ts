@@ -73,6 +73,19 @@ export async function wipe(buf: Uint8Array | null | undefined): Promise<void> {
   if (buf) s.memzero(buf);
 }
 
+// Recovery code for an emergency export: 32 characters (about 158 bits) from libsodium randomness, in groups of four.
+// The alphabet has no 0/O or 1/I/L, so a printed code reads back unambiguously.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 symbols
+export async function recoveryCode(): Promise<string> {
+  const s = await ready();
+  let out = "";
+  for (let i = 0; i < 32; i++) out += CODE_ALPHABET[s.randombytes_uniform(CODE_ALPHABET.length)];
+  return out.match(/.{4}/g)!.join("-");
+}
+
+/** A typed recovery code in the form it was sealed with: upper case, no spaces or dashes */
+export const canonicalCode = (typed: string): string => typed.toUpperCase().replace(/[\s-]/g, "");
+
 // Random password — randomness from libsodium (randombytes_uniform, unbiased). At least one character from each set.
 export async function randomPassword(length: number = 20, { symbols = true }: { symbols?: boolean } = {}): Promise<string> {
   const s = await ready();

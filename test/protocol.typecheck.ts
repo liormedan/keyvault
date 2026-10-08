@@ -11,8 +11,17 @@ export async function contract() {
   const { id } = await call("itemSave", { type: "login", title: "GitHub", fields: { username: "dana" } });
   id satisfies string;
 
-  const imp = await call("importCsv", { path: "C:/export.csv" });
+  const imp = await call("importFile", { path: "C:/export.csv" });
   imp.added satisfies number;
+
+  const health = await call("health", {});
+  health.reused[0]?.[0]?.title satisfies string | undefined;
+
+  const code = await call("itemTotp", { id: "x" });
+  code.remaining satisfies number;
+
+  // @ts-expect-error — the health report names items; it carries no passwords
+  health.weak[0].item.password;
 
   // @ts-expect-error — no such method
   await call("itemsave", {});

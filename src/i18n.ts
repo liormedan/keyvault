@@ -107,6 +107,22 @@ const EN = {
   "import.empty": "The file is empty or not a password CSV",
   "import.columns": "Expected columns not found (password, and url or name). Is this a browser password export?",
   "import.untitled": "(untitled)",
+  "import.unknown": "Unknown file format. Supported: a browser CSV, 1Password (.1pux or CSV), Bitwarden (.json), KeePass (.xml) and LastPass (CSV)",
+  "import.encrypted": 'This export is encrypted. Export again without a password (Bitwarden: "JSON", not "JSON (Encrypted)")',
+  "import.badZip": "The .1pux file is damaged or is not a 1Password export",
+  "import.extraFields": "{title} — extra fields",
+  "totp.invalid": "The two-factor key is not a valid base32 secret or otpauth:// link",
+  "totp.notTotp": "Only time-based codes (otpauth://totp/…) are supported",
+  "totp.none": "This item has no two-factor key",
+  "breach.failed": "Could not reach api.pwnedpasswords.com ({reason})",
+  "export.exists": "{path} already exists — choose another name",
+  "export.notExport": "{path} is not a kv-vault export",
+  "restore.exists": "A vault already exists at {path}. Use --force to replace it (the current one is kept as vault.kv.before-restore)",
+  "weak.common": "very common",
+  "weak.repeated": "one repeated character",
+  "weak.short": "shorter than 8 characters",
+  "weak.digits": "digits only",
+  "weak.letters": "letters only",
   "op.unknown": "Unknown action: {name}",
   "tty.none": "No terminal to type a password. Run first: kv unlock --remember",
   cancelled: "Cancelled",
@@ -135,12 +151,15 @@ const EN = {
   kv scan [dir] [--json] [--import]            find .env and key files; what's already in the vault
   kv doctor                                    check the setup
   kv import <project> <file.env>   import an env file
-  kv import-passwords <file.csv> [--delete]   import logins from a browser export (Chrome / Edge / Firefox)
+  kv import-passwords <file> [--delete]   import from a browser CSV, 1Password, Bitwarden, KeePass or LastPass export
+  kv audit [--breaches] [--json]   reused, weak and old passwords; --breaches: check known breaches (hash prefixes only)
   kv ui                            browser window to view, search and edit (local only)
   kv unlock --remember             remember the vault for this Windows user (no password each time)
   kv forget                        drop the remembered key
   kv backup [dir]                  dated encrypted copy (default: KV_BACKUP_DIR, or backups next to the vault)
   kv passwd                        change the master password
+  kv export <file> [--recovery-code]   encrypted emergency copy with its own password (or a printed recovery code)
+  kv restore <file> [--force]      make a vault from an export, with a new master password
   kv lang <en|he>                  interface language
   kv status [--json]               version, vault path, remembered, language
   kv completion <shell>            shell completion (bash, zsh, fish, powershell)
@@ -165,7 +184,8 @@ Vault: {vault}`,
   "cli.deleted": "Deleted: {ref}",
   "cli.usage.run": "Usage: kv run <project> -- <command>",
   "cli.usage.import": "Usage: kv import <project> <file.env>",
-  "cli.usage.importPasswords": "Usage: kv import-passwords <file.csv> [--delete]",
+  "cli.usage.importPasswords": "Usage: kv import-passwords <file> [--delete]",
+  "cli.usage.audit": "Usage: kv audit [--breaches] [--json]",
   "cli.usage.unlock": "Usage: kv unlock --remember",
   "cli.usage.lang": "Usage: kv lang <en|he>",
   "cli.usage.completion": "Usage: kv completion <bash|zsh|fish|powershell>",
@@ -179,9 +199,28 @@ Vault: {vault}`,
   "cli.imported": "Imported {n} keys into {project}: {names}",
   "cli.skippedEmpty": "Skipped (empty in the file): {names}",
   "cli.fileStillThere": "The original file is still on disk — delete it if you don't need it.",
-  "cli.importedLogins": "Added {added} logins. Duplicates skipped: {duplicates}. Rows without a password: {skipped}.",
-  "cli.csvDeleted": "The CSV file was deleted.",
-  "cli.csvPlain": "The CSV file holds the passwords in plain text — delete it (or run with --delete).",
+  "cli.importedItems": "{format}: added {added} items. Duplicates skipped: {duplicates}. Skipped (no password or empty): {skipped}.",
+  "cli.importDeleted": "The export file was deleted.",
+  "cli.importPlain": "The export file holds the passwords in plain text — delete it (or run with --delete).",
+  "cli.prompt.exportPw": "Password for the export (not your master password): ",
+  "cli.prompt.fileSecret": "Password or recovery code of {file}: ",
+  "cli.exported": "Exported (encrypted): {path}\nIt opens with the password you just chose, not with the master password. Restore with: kv restore <file>",
+  "cli.recoveryCode":
+    "Exported (encrypted): {path}\n\nRecovery code — write it down or print it. It is shown only this once:\n\n    {code}\n\nThe file is a snapshot of the vault as it is now. Keep it away from this computer (a USB stick, and the code printed in a drawer).\nRestore with: kv restore <file>",
+  "cli.restored": "Restored into {path} with the new master password. Run kv unlock --remember if you used remember me.",
+  "cli.usage.export": "Usage: kv export <file> [--recovery-code]",
+  "cli.usage.restore": "Usage: kv restore <file> [--force]",
+  "audit.title": "Password health — {n} passwords checked",
+  "audit.reused": "Reused — the same password on several items ({n} groups):",
+  "audit.weak": "Weak ({n}):",
+  "audit.old": "Not changed for over a year ({n}):",
+  "audit.no2fa": "Logins without a two-factor key: {n}",
+  "audit.clean": "No reused, weak or old passwords.",
+  "audit.breaches": "Found in known breaches ({n}) — change these first:",
+  "audit.breachesNone": "None of the {n} passwords appear in known breaches.",
+  "audit.breachNote": "Only the first 5 characters of each password's SHA-1 hash were sent to api.pwnedpasswords.com.",
+  "audit.seen": "seen {count} times",
+  "audit.more": "  … and {n} more",
   "cli.remembered": "Remembered for this user on this computer (DPAPI). To undo: kv forget",
   "cli.forgotten": "Remembered key removed — the master password will be required",
   "cli.backedUp": "Backed up (encrypted): {path}",
@@ -323,6 +362,22 @@ const HE: Record<MessageKey, string> = {
   "import.empty": "הקובץ ריק או שאינו קובץ CSV של סיסמאות",
   "import.columns": "לא נמצאו העמודות הצפויות (password, ו-url או name). זה קובץ ייצוא סיסמאות מדפדפן?",
   "import.untitled": "(ללא שם)",
+  "import.unknown": "סוג קובץ לא מוכר. נתמכים: CSV מדפדפן, 1Password (‏.1pux או CSV), Bitwarden (‏.json), KeePass (‏.xml) ו-LastPass (CSV)",
+  "import.encrypted": 'קובץ הייצוא מוצפן. יש לייצא שוב בלי סיסמה (ב-Bitwarden: "JSON", לא "JSON (Encrypted)")',
+  "import.badZip": "קובץ ה-‎.1pux פגום או שאינו ייצוא של 1Password",
+  "import.extraFields": "{title} — שדות נוספים",
+  "totp.invalid": "מפתח האימות הדו-שלבי אינו סוד base32 או קישור otpauth://‎ תקין",
+  "totp.notTotp": "נתמכים רק קודים מבוססי זמן (otpauth://totp/…‎)",
+  "totp.none": "לפריט הזה אין מפתח אימות דו-שלבי",
+  "breach.failed": "אין חיבור ל-api.pwnedpasswords.com ‏({reason})",
+  "export.exists": "{path} כבר קיים — בחר שם אחר",
+  "export.notExport": "{path} אינו קובץ ייצוא של kv-vault",
+  "restore.exists": "כבר יש כספת ב-{path}. הוסף --force כדי להחליף אותה (הנוכחית תישמר בשם vault.kv.before-restore)",
+  "weak.common": "נפוצה מאוד",
+  "weak.repeated": "תו אחד שחוזר",
+  "weak.short": "קצרה מ-8 תווים",
+  "weak.digits": "ספרות בלבד",
+  "weak.letters": "אותיות בלבד",
   "op.unknown": "פעולה לא מוכרת: {name}",
   "tty.none": "אין טרמינל להקלדת סיסמה. הרץ קודם: kv unlock --remember",
   cancelled: "בוטל",
@@ -351,12 +406,15 @@ const HE: Record<MessageKey, string> = {
   kv scan [תיקייה] [--json] [--import]         מוצא קובצי .env ומפתחות; מה כבר בכספת
   kv doctor                                    בדיקת ההתקנה
   kv import <פרויקט> <קובץ.env>  ייבוא מקובץ env
-  kv import-passwords <קובץ.csv> [--delete]   ייבוא סיסמאות מקובץ ייצוא של דפדפן (Chrome / Edge / Firefox)
+  kv import-passwords <קובץ> [--delete]   ייבוא מ-CSV של דפדפן, 1Password, ‏Bitwarden, ‏KeePass או LastPass
+  kv audit [--breaches] [--json]   סיסמאות חוזרות, חלשות וישנות; ‎--breaches: בדיקת דליפות (רק תחילית של hash)
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)
   kv unlock --remember           זכירת הכספת למשתמש הזה ב-Windows (בלי להקליד סיסמה כל פעם)
   kv forget                      ביטול הזכירה
   kv backup [תיקייה]             עותק מוצפן עם תאריך (ברירת מחדל: KV_BACKUP_DIR, או backups ליד הכספת)
   kv passwd                      החלפת סיסמת אב
+  kv export <קובץ> [--recovery-code]   עותק חירום מוצפן בסיסמה משלו (או בקוד שחזור להדפסה)
+  kv restore <קובץ> [--force]    כספת מקובץ ייצוא, עם סיסמת אב חדשה
   kv lang <en|he>                שפת הממשק
   kv status [--json]             גרסה, מיקום הכספת, זכירה, שפה
   kv completion <shell>          השלמה אוטומטית (bash, zsh, fish, powershell)
@@ -381,7 +439,8 @@ const HE: Record<MessageKey, string> = {
   "cli.deleted": "נמחק: {ref}",
   "cli.usage.run": "שימוש: kv run <פרויקט> -- <פקודה>",
   "cli.usage.import": "שימוש: kv import <פרויקט> <קובץ.env>",
-  "cli.usage.importPasswords": "שימוש: kv import-passwords <קובץ.csv> [--delete]",
+  "cli.usage.importPasswords": "שימוש: kv import-passwords <קובץ> [--delete]",
+  "cli.usage.audit": "שימוש: kv audit [--breaches] [--json]",
   "cli.usage.unlock": "שימוש: kv unlock --remember",
   "cli.usage.lang": "שימוש: kv lang <en|he>",
   "cli.usage.completion": "שימוש: kv completion <bash|zsh|fish|powershell>",
@@ -395,9 +454,28 @@ const HE: Record<MessageKey, string> = {
   "cli.imported": "יובאו {n} מפתחות ל-{project}: {names}",
   "cli.skippedEmpty": "דולגו (ריקים בקובץ): {names}",
   "cli.fileStillThere": "הקובץ המקורי עדיין על הדיסק — מחק אותו אם אין בו צורך.",
-  "cli.importedLogins": "נוספו {added} התחברויות. כפילויות שדולגו: {duplicates}. שורות בלי סיסמה: {skipped}.",
-  "cli.csvDeleted": "קובץ ה-CSV נמחק.",
-  "cli.csvPlain": "קובץ ה-CSV מכיל את הסיסמאות בטקסט גלוי — מחק אותו (או הרץ עם --delete).",
+  "cli.importedItems": "{format}: נוספו {added} פריטים. כפילויות שדולגו: {duplicates}. דולגו (בלי סיסמה או ריקים): {skipped}.",
+  "cli.importDeleted": "קובץ הייצוא נמחק.",
+  "cli.importPlain": "קובץ הייצוא מכיל את הסיסמאות בטקסט גלוי — מחק אותו (או הרץ עם --delete).",
+  "cli.prompt.exportPw": "סיסמה לקובץ הייצוא (לא סיסמת האב): ",
+  "cli.prompt.fileSecret": "הסיסמה או קוד השחזור של {file}: ",
+  "cli.exported": "יוצא (מוצפן): {path}\nהוא נפתח בסיסמה שבחרת עכשיו, לא בסיסמת האב. שחזור: kv restore <קובץ>",
+  "cli.recoveryCode":
+    "יוצא (מוצפן): {path}\n\nקוד שחזור — רשום או הדפס אותו. הוא מוצג רק הפעם:\n\n    {code}\n\nהקובץ הוא תמונת מצב של הכספת כרגע. שמור אותו רחוק מהמחשב הזה (דיסק און קי, ואת הקוד מודפס במגירה).\nשחזור: kv restore <קובץ>",
+  "cli.restored": 'שוחזר אל {path} עם סיסמת האב החדשה. אם השתמשת ב"זכור אותי", הרץ kv unlock --remember.',
+  "cli.usage.export": "שימוש: kv export <קובץ> [--recovery-code]",
+  "cli.usage.restore": "שימוש: kv restore <קובץ> [--force]",
+  "audit.title": "בריאות הסיסמאות — נבדקו {n} סיסמאות",
+  "audit.reused": "חוזרות — אותה סיסמה בכמה פריטים ({n} קבוצות):",
+  "audit.weak": "חלשות ({n}):",
+  "audit.old": "לא הוחלפו יותר משנה ({n}):",
+  "audit.no2fa": "התחברויות בלי מפתח אימות דו-שלבי: {n}",
+  "audit.clean": "אין סיסמאות חוזרות, חלשות או ישנות.",
+  "audit.breaches": "הופיעו בדליפות ידועות ({n}) — להחליף קודם:",
+  "audit.breachesNone": "אף אחת מ-{n} הסיסמאות לא הופיעה בדליפות ידועות.",
+  "audit.breachNote": "נשלחו ל-api.pwnedpasswords.com רק 5 התווים הראשונים של קוד ה-SHA-1 של כל סיסמה.",
+  "audit.seen": "הופיעה {count} פעמים",
+  "audit.more": "  … ועוד {n}",
   "cli.remembered": "נזכר למשתמש הזה במחשב הזה (DPAPI). לביטול: kv forget",
   "cli.forgotten": "הזכירה בוטלה — מעכשיו תידרש סיסמת אב",
   "cli.backedUp": "גובה (מוצפן): {path}",

@@ -1,7 +1,7 @@
 // The desktop window. Every action goes to the backend (src/backend.ts) through Tauri's `kv` command,
 // typed against src/protocol.ts — the same contract the backend implements.
 // Secret fields reach the window only on reveal or edit; copy goes from the backend straight to the clipboard.
-import type { FieldDef, ItemTypeName, ListedDevKey as DevEntryRow, ListedItem, MaskedItem, TypeDef } from "../../src/model.ts";
+import type { BreachReport, FieldDef, HealthReport, ItemTypeName, ListedDevKey as DevEntryRow, ListedItem, MaskedItem, TypeDef } from "../../src/model.ts";
 import type { ImportResult, Method, Params, Result, Status } from "../../src/protocol.ts";
 import { LOCKED } from "../../src/protocol.ts";
 
@@ -54,12 +54,15 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 // ── State ──
 
 const DEV = "dev";
-type Category = "all" | "fav" | typeof DEV | ItemTypeName;
+const HEALTH = "health";
+type Category = "all" | "fav" | typeof DEV | typeof HEALTH | ItemTypeName;
 
 let TYPES = {} as Record<ItemTypeName, TypeDef>;
 let items: ListedItem[] = [];
 let projects: Record<string, DevEntryRow[]> = {};
 let cat: Category = "all";
+let health: HealthReport | null = null;
+let breaches: BreachReport | null = null;
 
 const isType = (c: string): c is ItemTypeName => Object.hasOwn(TYPES, c);
 
@@ -116,6 +119,7 @@ async function load(): Promise<void> {
   const [a, b] = await Promise.all([kv("items"), kv("list")]);
   items = a.items;
   projects = b.projects;
+  health = null; // recomputed on the next visit — items may have changed
   render();
 }
 
@@ -142,6 +146,7 @@ function renderCats(): void {
   $("#cats").replaceChildren(
     btn("all", tr("cat.all"), items.length + devCount()),
     btn("fav", tr("cat.fav"), items.filter((i) => i.fav).length),
+    btn(HEALTH, tr("cat.health"), 0),
     el("hr"),
     ...(Object.entries(TYPES) as [ItemTypeName, TypeDef][]).map(([t, d]) => btn(t, L(d.plural), count(t))),
     el("hr"),
@@ -151,6 +156,10 @@ function renderCats(): void {
 
 function render(): void {
   renderCats();
+  if (cat === HEALTH) {
+    renderHealth();
+    return;
+  }
   const q = $<HTMLInputElement>("#q").value.trim().toLowerCase();
   const hit = (...s: (string | undefined)[]) =>
     !q ||
@@ -272,6 +281,142 @@ function devRow(p: string, e: DevEntryRow): HTMLElement {
   );
 }
 
+// ── Password health ──
+// The backend computes the report from the open vault; the window gets item names and reasons, never a password.
+
+let healthLoading = false;
+
+async function loadHealth(): Promise<void> {
+  if (healthLoading) return;
+  healthLoading = true;
+  try {
+    health = await kv("health");
+  } catch (e) {
+    toast(message(e));
+  } finally {
+    healthLoading = false;
+  }
+  if (cat === HEALTH) render();
+}
+
+const MAX_ROWS = 50;
+
+function healthRows(list: ListedItem[], tag?: (i: ListedItem) => string): HTMLElement[] {
+  const rows = list
+    .slice(0, MAX_ROWS)
+    .map((i) =>
+      el(
+        "div",
+        { className: "hrow" },
+        el(
+          "button",
+          { className: "open", type: "button", onclick: () => void openItem(i.id) },
+          el("span", { className: "title", textContent: i.title }),
+          el("span", { className: "sub" }, ...bidiParts(i.sub)),
+        ),
+        tag ? el("span", { className: "kind", textContent: tag(i) }) : null,
+      ),
+    );
+  if (list.length > MAX_ROWS) rows.push(el("p", { className: "muted more", textContent: tr("health.more", { n: list.length - MAX_ROWS }) }));
+  return rows;
+}
+
+function breachBox(): HTMLElement {
+  const out = el("div", { className: "breach-out" });
+  if (breaches) {
+    const b = breaches;
+    out.append(
+      el("p", {
+        className: b.found.length ? "bad" : "good",
+        textContent: b.found.length ? tr("breach.found", { n: b.found.length }) : tr("breach.none", { n: b.checked }),
+      }),
+      ...b.found
+        .slice(0, MAX_ROWS)
+        .map((f) =>
+          el(
+            "div",
+            { className: "group" },
+            el("p", { className: "muted", textContent: tr("breach.seen", { count: f.count.toLocaleString() }) }),
+            ...healthRows(f.items),
+          ),
+        ),
+    );
+  }
+  const check = el("button", {
+    type: "button",
+    className: breaches ? "" : "primary",
+    textContent: tr(breaches ? "breach.again" : "breach.check"),
+    onclick: async () => {
+      check.disabled = true;
+      check.textContent = tr("health.loading");
+      try {
+        breaches = await kv("breaches");
+      } catch (e) {
+        toast(message(e));
+      }
+      render();
+    },
+  });
+  return el(
+    "section",
+    { className: "breach" },
+    el("h2", { textContent: tr("breach.title") }),
+    el("p", { className: "muted", textContent: tr("breach.lead") }),
+    out,
+    el("div", { className: "actions" }, check),
+  );
+}
+
+function renderHealth(): void {
+  if (!health) {
+    void loadHealth();
+    $("#list").replaceChildren(el("p", { className: "empty", textContent: tr("health.loading") }));
+    return;
+  }
+  const h = health;
+  const reason = new Map(h.weak.map((w) => [w.item.id, tr(`weak.${w.reason}`)]));
+  const part = (title: string, lead: string | null, body: HTMLElement[]) =>
+    el("section", {}, el("h2", { textContent: title }), lead ? el("p", { className: "muted lead", textContent: lead }) : null, ...body);
+  const out: HTMLElement[] = [
+    el(
+      "p",
+      { className: "health-sum" },
+      tr("health.summary", { n: h.checked }),
+      ...[
+        [h.reused.length, "health.reusedCount"],
+        [h.weak.length, "health.weakCount"],
+        [h.old.length, "health.oldCount"],
+      ].map(([n, key]) => el("span", { className: `chip${n ? " warn" : ""}`, textContent: tr(key as "health.reusedCount", { n }) })),
+    ),
+    breachBox(),
+  ];
+  if (h.reused.length)
+    out.push(
+      part(
+        tr("health.reused"),
+        tr("health.reusedLead"),
+        h.reused
+          .slice(0, MAX_ROWS)
+          .map((g) => el("div", { className: "group" }, el("p", { className: "muted", textContent: tr("health.group", { n: g.length }) }), ...healthRows(g))),
+      ),
+    );
+  if (h.weak.length)
+    out.push(
+      part(
+        tr("health.weak"),
+        null,
+        healthRows(
+          h.weak.map((w) => w.item),
+          (i) => reason.get(i.id) ?? "",
+        ),
+      ),
+    );
+  if (h.old.length) out.push(part(tr("health.old"), null, healthRows(h.old)));
+  if (!h.reused.length && !h.weak.length && !h.old.length) out.push(el("p", { className: "empty", textContent: tr("health.clean") }));
+  if (h.no2fa.length) out.push(part(`${tr("health.no2fa")} (${h.no2fa.length})`, tr("health.no2faLead"), healthRows(h.no2fa)));
+  $("#list").replaceChildren(...out);
+}
+
 // ── Item: view ──
 
 const dlg = () => $<HTMLDialogElement>("#itemDlg");
@@ -283,6 +428,52 @@ const bidiParts = (text: string): (string | HTMLElement)[] =>
     .flatMap((part, i) => [...(i ? [" · "] : []), el("span", { dir: /[֐-׿]/.test(part) ? "rtl" : "ltr", textContent: part })]);
 
 const cardFmt = (v: string) => v.replace(/\D/g, "").replace(/(.{4})(?=.)/g, "$1 ");
+
+/** The live two-factor code: fetched when it changes, counted down here. Stops after 5 minutes so an open dialog doesn't keep the vault awake. */
+function totpRow(id: string): HTMLElement {
+  const code = el("span", { className: "v ltr totp-code", textContent: "··· ···" });
+  const left = el("span", { className: "muted totp-left" });
+  let remaining = 0;
+  let fetches = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const refresh = async () => {
+    try {
+      const r = await kv("itemTotp", { id });
+      const half = Math.ceil(r.code.length / 2);
+      code.textContent = `${r.code.slice(0, half)} ${r.code.slice(half)}`;
+      remaining = r.remaining;
+      left.textContent = tr("totp.seconds", { s: remaining });
+    } catch (e) {
+      clearInterval(timer);
+      code.textContent = "";
+      left.textContent = message(e);
+    }
+  };
+  timer = setInterval(() => {
+    if (!code.isConnected) return clearInterval(timer);
+    if (--remaining > 0) {
+      left.textContent = tr("totp.seconds", { s: remaining });
+      return;
+    }
+    if (++fetches >= 10) {
+      clearInterval(timer);
+      code.textContent = "··· ···";
+      left.textContent = tr("totp.paused");
+      return;
+    }
+    void refresh();
+  }, 1000);
+  void refresh();
+  const copy = el("button", {
+    type: "button",
+    textContent: tr("totp.copy"),
+    onclick: safe(async () => {
+      await kv("itemTotpCopy", { id });
+      toast(tr("copied"));
+    }),
+  });
+  return el("div", {}, el("dt", { textContent: tr("totp.label") }), el("dd", {}, code, left, copy));
+}
 const MASK = "••••••••";
 
 async function openItem(id: string): Promise<void> {
@@ -333,7 +524,8 @@ async function openItem(id: string): Promise<void> {
           timer = setTimeout(conceal, 30000);
         }),
       });
-      return el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, reveal, copy));
+      const row = el("div", {}, el("dt", { textContent: L(f.label) }), el("dd", {}, val, reveal, copy));
+      return f.k === "totp" ? el("div", { className: "pair" }, totpRow(id), row) : row;
     });
 
   dlg().replaceChildren(
@@ -510,11 +702,15 @@ function openImport(): void {
     textContent: tr("import.choose"),
     onclick: async () => {
       errEl.textContent = "";
-      const file = await window.__TAURI__.dialog.open({ multiple: false, directory: false, filters: [{ name: "CSV", extensions: ["csv"] }] });
+      const file = await window.__TAURI__.dialog.open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: tr("import.filter"), extensions: ["csv", "1pux", "json", "xml"] }],
+      });
       if (typeof file !== "string") return;
       choose.disabled = true;
       try {
-        const res = await kv("importCsv", { path: file });
+        const res = await kv("importFile", { path: file });
         await load();
         importDone(res);
       } catch (err) {
@@ -552,7 +748,7 @@ function openImport(): void {
 }
 
 function importDone(res: ImportResult): void {
-  const parts = [tr("import.added", { n: res.added })];
+  const parts = [`${res.format}: ${tr("import.added", { n: res.added })}`];
   if (res.duplicates) parts.push(tr("import.duplicates", { n: res.duplicates }));
   if (res.skipped) parts.push(tr("import.skipped", { n: res.skipped }));
   const del = el("button", {
@@ -575,8 +771,88 @@ function importDone(res: ImportResult): void {
       el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("import.keep"), onclick: () => dlg().close() }), del),
     ),
   );
-  cat = "login";
+  cat = "all";
   render();
+}
+
+// ── Emergency export ──
+// An encrypted copy under its own password, or under a generated recovery code shown once.
+
+function openExport(): void {
+  const errEl = el("p", { className: "err", role: "alert" });
+  const mode = { code: true };
+  const radio = (code: boolean, label: string) =>
+    el(
+      "label",
+      { className: "check" },
+      el("input", {
+        type: "radio",
+        name: "exportMode",
+        checked: mode.code === code,
+        onchange: () => {
+          mode.code = code;
+          pwBox.hidden = code;
+        },
+      }),
+      label,
+    );
+  const a = el("input", { type: "password", autocomplete: "new-password", dir: "ltr" });
+  const b = el("input", { type: "password", autocomplete: "new-password", dir: "ltr" });
+  const pwBox = el("div", { className: "fields-wrap", hidden: true }, el("label", {}, tr("export.password"), a), el("label", {}, tr("export.again"), b));
+  const save = el("button", {
+    type: "button",
+    className: "primary",
+    textContent: tr("export.save"),
+    onclick: async () => {
+      errEl.textContent = "";
+      if (!mode.code && (!a.value || a.value !== b.value)) {
+        errEl.textContent = tr(a.value ? "pw.mismatch" : "export.noPassword");
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      const file = await window.__TAURI__.dialog.save({ defaultPath: `kv-vault-export-${stamp}.kv`, filters: [{ name: "kv-vault", extensions: ["kv"] }] });
+      if (typeof file !== "string") return;
+      save.disabled = true;
+      try {
+        const res = await kv("exportVault", mode.code ? { path: file } : { path: file, password: a.value });
+        a.value = b.value = "";
+        exportDone(file, res.code);
+      } catch (err) {
+        errEl.textContent = message(err);
+        save.disabled = false;
+      }
+    },
+  });
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("export.title") }),
+      el("p", { className: "muted", textContent: tr("export.lead") }),
+      radio(true, tr("export.withCode")),
+      radio(false, tr("export.withPassword")),
+      pwBox,
+      el("p", { className: "muted", textContent: tr("export.snapshot") }),
+      errEl,
+      el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("cancel"), onclick: () => dlg().close() }), save),
+    ),
+  );
+  if (!dlg().open) dlg().showModal();
+}
+
+function exportDone(file: string, code?: string): void {
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("export.done") }),
+      el("p", {}, tr("export.savedTo"), " ", el("code", { dir: "ltr", textContent: file })),
+      code ? el("p", { textContent: tr("export.codeLead") }) : el("p", { className: "muted", textContent: tr("export.passwordDone") }),
+      code ? el("p", { className: "recovery-code", id: "recoveryCode", dir: "ltr", textContent: code }) : null,
+      el("p", { className: "muted" }, tr("export.restore"), " ", el("code", { dir: "ltr", textContent: "kv restore <file>" })),
+      el("div", { className: "actions" }, el("button", { type: "button", className: "primary", textContent: tr("close"), onclick: () => dlg().close() })),
+    ),
+  );
 }
 
 // ── Dev key ──
@@ -669,6 +945,7 @@ $("#lock").onclick = async () => {
 
 // Windows was locked (or the machine slept): the shell already locked the backend
 void window.__TAURI__.event.listen("kv-locked", () => void lockedView());
+$("#exportBtn").onclick = () => openExport();
 $("#forget").onclick = safe(async () => {
   await kv("forget");
   $("#forget").hidden = true;

@@ -19,7 +19,11 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/model.ts` | the data model (vault file, items, listings) — types only |
 | `src/protocol.ts` | the window ↔ backend contract: every method's params and result. Change it first, then both sides; `test/protocol.typecheck.ts` proves bad calls fail to compile |
 | `src/types.ts` | item types — fields, `secret`, `generate`, `primary`. Single source for the backend and the window |
-| `src/import-csv.ts` | login import from a browser / password-manager CSV export. Never read a browser's password store directly — only the user's own export file |
+| `src/import-csv.ts` | CSV export parser (browsers, LastPass, 1Password/Bitwarden CSV). Never read a browser's password store directly — only the user's own export file |
+| `src/import-file.ts` + `src/unzip.ts` | every import: recognises CSV, 1Password `.1pux` (zip), Bitwarden JSON, KeePass XML by content. Secret extra fields go into a secure note, never into plain notes |
+| `src/health.ts` | password health (reused, weak, old, no 2FA) — names only, in memory |
+| `src/breach.ts` | Have I Been Pwned range check, only on request; only 5 hex chars of SHA-1 leave. The fetcher is injectable — tests never touch the network |
+| `src/totp.ts` | RFC 6238 codes from a login's `totp` field. HMAC and the breach SHA-1 come from `node:crypto` (protocol requirements libsodium lacks) — the vault's encryption stays libsodium-only |
 | `src/backend.ts` | desktop backend: one JSON line per request/reply on stdin/stdout, auto-lock after 15 minutes. `methods ... satisfies Handlers` — checked against `src/protocol.ts`. Finishes queued requests before exiting on stdin close |
 | `src/remember.ts` | "remember me" per platform: DPAPI on Windows (`dpapi.ts`), Keychain / Secret Service elsewhere (`@napi-rs/keyring`, optional native dependency — external to the bundles) |
 | `src/project.ts` | `.kv.json` — find the project from the cwd upwards, suggest a name, write the file (names only) |

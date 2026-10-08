@@ -1,7 +1,8 @@
 // The contract between the desktop window and the backend (src/backend.js).
 // One JSON line per request on stdin, one per reply on stdout. Both sides type against this file,
 // so a wrong method name or a missing parameter fails at compile time instead of at runtime.
-import type { Fields, ItemTypeName, Lang, ListedDevKey, ListedItem, MaskedItem, TypeDef } from "./model.ts";
+import type { BreachReport, Fields, HealthReport, ItemTypeName, Lang, ListedDevKey, ListedItem, MaskedItem, TypeDef } from "./model.ts";
+import type { TotpCode } from "./totp.ts";
 
 /** The error string for "the vault is locked" — the window shows the unlock screen on it */
 export const LOCKED = "locked";
@@ -20,8 +21,11 @@ export interface Status {
 }
 
 export interface ImportResult {
+  /** "CSV", "1Password", "Bitwarden" or "KeePass" */
+  format: string;
   added: number;
   duplicates: number;
+  /** entries with nothing to keep, or too large for the vault */
   skipped: number;
   /** the file's base name, for the "delete it now" prompt */
   file: string;
@@ -53,10 +57,21 @@ export interface Methods {
   itemSave: { params: { id?: string; type: ItemTypeName; title: string; fields: Fields }; result: { id: string } };
   itemFav: { params: { id: string; fav: boolean }; result: Ok };
   itemDelete: { params: { id: string }; result: Ok };
+  /** the current two-factor code of an item with a `totp` field */
+  itemTotp: { params: { id: string }; result: TotpCode };
+  itemTotpCopy: { params: { id: string }; result: Ok };
 
-  // browser import — only the path crosses the window
-  importCsv: { params: { path: string }; result: ImportResult };
+  // password health — names only
+  health: { params: None; result: HealthReport };
+  /** network: sends the first 5 hex characters of each password's SHA-1 to api.pwnedpasswords.com */
+  breaches: { params: None; result: BreachReport };
+
+  // import from a browser or password-manager export — only the path crosses the window
+  importFile: { params: { path: string }; result: ImportResult };
   importCleanup: { params: None; result: Ok };
+
+  /** emergency export to a new file: with a password, or without one to get a generated recovery code (shown once) */
+  exportVault: { params: { path: string; password?: string }; result: { code?: string } };
 
   generate: { params: { length?: number; symbols?: boolean }; result: { value: string } };
 }
