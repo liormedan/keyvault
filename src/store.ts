@@ -4,12 +4,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { deriveKey, newKdfParams, open, seal } from "./crypto.ts";
+import { canonicalCode, deriveKey, newKdfParams, open, seal, wipe } from "./crypto.ts";
 import { t } from "./i18n.ts";
 import type {
   DevEntry,
   Fields,
-  ImportedLogin,
+  ImportedItem,
   Item,
   ItemTypeName,
   ListedDevKey,
@@ -241,26 +241,84 @@ export function deleteItem(data: VaultData, id: string): void {
   delete data.items[String(id)];
 }
 
-// Bulk import of logins (browser CSV). An entry identical to an existing login
-// (same URL, username and password) is skipped. Returns counts only.
-export function importLogins(data: VaultData, logins: ImportedLogin[]): { added: number; duplicates: number } {
-  const sig = (f: Fields) => `${f.url || ""}\n${f.username || ""}\n${f.password || ""}`;
-  const seen = new Set(
-    Object.values(data.items)
-      .filter((it) => it.type === "login")
-      .map((it) => sig(it.fields)),
-  );
+// Bulk import (browser CSV, 1Password, Bitwarden, KeePass). An entry identical to an existing item is skipped:
+// for logins the same URL, username and password; for other types the same title and fields.
+// An entry the vault can't hold (a field over the size limit) is counted as invalid; the rest still go in. Counts only.
+export function importItems(data: VaultData, incoming: ImportedItem[]): { added: number; duplicates: number; invalid: number } {
+  const sig = (it: { type: ItemTypeName; title: string; fields: Fields }) =>
+    JSON.stringify(
+      it.type === "login"
+        ? ["login", it.fields.url || "", it.fields.username || "", it.fields.password || ""]
+        : [it.type, it.title, Object.entries(it.fields).sort(([a], [b]) => a.localeCompare(b))],
+    );
+  const seen = new Set(Object.values(data.items).map(sig));
   let added = 0;
   let duplicates = 0;
-  for (const l of logins) {
-    const key = sig(l.fields);
+  let invalid = 0;
+  for (const it of incoming) {
+    let id: string;
+    try {
+      id = saveItem(data, { type: it.type, title: it.title, fields: it.fields });
+    } catch {
+      invalid++;
+      continue;
+    }
+    const key = sig(data.items[id]!); // after saveItem's trimming, so re-imports match
     if (seen.has(key)) {
+      delete data.items[id];
       duplicates++;
       continue;
     }
-    saveItem(data, { type: "login", title: l.title, fields: l.fields });
     seen.add(key);
     added++;
   }
-  return { added, duplicates };
+  return { added, duplicates, invalid };
+}
+
+// ── Emergency export ──
+// The same file format as the vault, sealed under a separate password (or a recovery code) with fresh KDF
+// parameters. A snapshot: it does not follow later changes. `kv restore` turns it back into a vault.
+
+export async function exportTo(file: string, data: VaultData, password: string): Promise<void> {
+  if (!password) throw new Error(t("pw.empty"));
+  const header: VaultHeader = { v: 1, kdf: await newKdfParams() };
+  const key = await deriveKey(password, header.kdf);
+  try {
+    const sealed = await seal(key, data, header);
+    // wx: create only — an existing file is never overwritten (no separate exists check to race with)
+    fs.writeFileSync(file, JSON.stringify(sealed, null, 1), { mode: 0o600, flag: "wx" });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(t("export.exists", { path: file }));
+    throw e;
+  } finally {
+    await wipe(key);
+  }
+}
+
+/**
+ * Open an export (or any vault file) with its password or recovery code. The secret is tried as typed first;
+ * then, if it differs, in a recovery code's canonical form — a code may be typed in lower case or without dashes.
+ */
+export async function openExport(file: string, secret: string): Promise<VaultData> {
+  let sealed: VaultFile;
+  try {
+    sealed = JSON.parse(fs.readFileSync(file, "utf8")) as VaultFile;
+  } catch {
+    throw new Error(t("export.notExport", { path: file }));
+  }
+  if (!sealed || typeof sealed !== "object" || !sealed.kdf || !sealed.ct || !sealed.nonce) throw new Error(t("export.notExport", { path: file }));
+  const attempt = async (pw: string) => {
+    const key = await deriveKey(pw, sealed.kdf);
+    try {
+      return normalize(await open<Partial<VaultData>>(key, sealed));
+    } finally {
+      await wipe(key);
+    }
+  };
+  try {
+    return await attempt(secret);
+  } catch (e) {
+    if (canonicalCode(secret) === secret) throw e;
+    return attempt(canonicalCode(secret));
+  }
 }

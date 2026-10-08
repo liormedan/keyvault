@@ -1,11 +1,8 @@
 // Import logins from a password CSV exported by a browser (Chrome, Edge, Firefox, Safari)
 // or a password manager (Bitwarden, LastPass, 1Password). Columns are matched by name, not position.
 // The export is plaintext — values are parsed in memory and never logged or echoed.
-import fs from "node:fs";
 import { t } from "./i18n.ts";
-import type { ImportedLogin } from "./model.ts";
-
-const MAX_BYTES = 20 * 1024 * 1024;
+import type { ImportedItem } from "./model.ts";
 
 // RFC 4180: quoted fields, "" as an escaped quote, commas and newlines inside quotes
 export function parseCsv(text: string): string[][] {
@@ -62,7 +59,7 @@ const hostOf = (url: string): string => {
 };
 
 // → { logins: [{ title, fields }], skipped } — rows without a password are skipped
-export function csvToLogins(text: string): { logins: ImportedLogin[]; skipped: number } {
+export function csvToLogins(text: string): { logins: ImportedItem[]; skipped: number } {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error(t("import.empty"));
   const header = rows[0].map((h) => h.trim().toLowerCase());
@@ -71,7 +68,7 @@ export function csvToLogins(text: string): { logins: ImportedLogin[]; skipped: n
   if (col.password < 0 || (col.url < 0 && col.title < 0)) {
     throw new Error(t("import.columns"));
   }
-  const logins: ImportedLogin[] = [];
+  const logins: ImportedItem[] = [];
   let skipped = 0;
   for (const r of rows.slice(1)) {
     const get = (f: Column) => (col[f] >= 0 ? (r[col[f]] ?? "") : "");
@@ -82,21 +79,10 @@ export function csvToLogins(text: string): { logins: ImportedLogin[]; skipped: n
     }
     const url = get("url").trim();
     logins.push({
+      type: "login",
       title: get("title").trim() || hostOf(url) || t("import.untitled"),
       fields: { url, username: get("username").trim(), password, totp: get("totp").trim(), notes: get("notes") },
     });
   }
   return { logins, skipped };
-}
-
-export function readLoginsFile(file: string): { logins: ImportedLogin[]; skipped: number } {
-  let st: fs.Stats;
-  try {
-    st = fs.statSync(file);
-  } catch {
-    throw new Error(t("import.notFound"));
-  }
-  if (!st.isFile()) throw new Error(t("import.notFile"));
-  if (st.size > MAX_BYTES) throw new Error(t("import.tooBig"));
-  return csvToLogins(fs.readFileSync(file, "utf8"));
 }

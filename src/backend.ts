@@ -4,14 +4,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { randomPassword, wipe } from "./crypto.ts";
+import { breachReport } from "./breach.ts";
+import { canonicalCode, randomPassword, recoveryCode, wipe } from "./crypto.ts";
+import { healthReport } from "./health.ts";
 import * as remember from "./remember.ts";
 import { getLang, setLang, t } from "./i18n.ts";
 import type { Handlers, Method, Reply } from "./protocol.ts";
 import { LOCKED } from "./protocol.ts";
-import { readLoginsFile } from "./import-csv.ts";
+import { readImportFile } from "./import-file.ts";
 import { copyWithClear } from "./io.ts";
 import * as store from "./store.ts";
+import { totp } from "./totp.ts";
 import { TYPES } from "./types.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
@@ -36,6 +39,12 @@ function need(): store.Session {
 }
 
 const str = (v: unknown) => String(v ?? "").trim();
+
+function totpField(id: string): string {
+  const v = store.getItem(need().data, id).fields.totp;
+  if (!v) throw new Error(t("totp.none"));
+  return v;
+}
 
 // Params arrive as JSON from the window, so values are still coerced with str() / String() at runtime.
 const methods = {
@@ -146,15 +155,26 @@ const methods = {
     return { ok: true as const };
   },
 
-  // Import a browser password export. The window sends only the path; values never reach it.
-  async importCsv({ path: file }) {
+  itemTotp: ({ id }) => totp(totpField(id)),
+
+  itemTotpCopy({ id }) {
+    copyWithClear(totp(totpField(id)).code, 20);
+    return { ok: true as const };
+  },
+
+  health: () => healthReport(need().data),
+
+  breaches: () => breachReport(need().data),
+
+  // Import a browser or password-manager export. The window sends only the path; values never reach it.
+  async importFile({ path: file }) {
     const { key, data } = need();
     file = String(file || "");
-    const { logins, skipped } = readLoginsFile(file);
-    const { added, duplicates } = store.importLogins(data, logins);
+    const parsed = readImportFile(file);
+    const { added, duplicates, invalid } = store.importItems(data, parsed.items);
     if (added) await store.save(key, data);
     lastImport = file;
-    return { added, duplicates, skipped, file: path.basename(file) };
+    return { format: parsed.format, added, duplicates, skipped: parsed.skipped + invalid, file: path.basename(file) };
   },
 
   importCleanup() {
@@ -162,6 +182,14 @@ const methods = {
     fs.rmSync(lastImport, { force: true });
     lastImport = null;
     return { ok: true as const };
+  },
+
+  // Emergency export. Without a password a recovery code is generated, used, and returned once for the user to write down.
+  async exportVault({ path: file, password }) {
+    const { data } = need();
+    const code = password ? undefined : await recoveryCode();
+    await store.exportTo(String(file || ""), data, password ? String(password) : canonicalCode(code!));
+    return code ? { code } : {};
   },
 
   generate: async ({ length, symbols }) => ({ value: await randomPassword(length, { symbols: symbols !== false }) }),

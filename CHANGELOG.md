@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.0 — 2026-10-08
+
+The first release aimed at everyday use, not only developers' keys.
+
+### Added
+
+- **Password health** — a new "Password health" view in the app, and `kv audit` on the command line: passwords reused across items, weak ones (very common, under 8 characters, digits or letters only, one repeated character), ones not changed for a year, and logins without two-factor. Names only — the report never carries a password.
+- **Breach check**, opt-in: "Check now" in the health view, or `kv audit --breaches`. Uses Have I Been Pwned's range API — only the first 5 hex characters of each password's SHA-1 leave the machine, with response padding on; the match happens locally. This is the only network call kv-vault makes, and only when asked.
+- **Two-factor codes** — a login's two-factor field accepts a base32 key or an `otpauth://totp/` link (SHA-1/256/512, 6–8 digits, any period); the item shows the live code with a countdown and a copy button. The code refreshes for 5 minutes, then pauses so an open dialog doesn't keep the vault awake.
+- **Import from password managers** — besides browser CSVs: 1Password (`.1pux`, and CSV), Bitwarden (unencrypted `.json`: logins, cards, identities, notes), KeePass 2 (`.xml`: current entries only — no history, no recycle bin). The format is recognised from the content. Two-factor keys come along; fields a manager marks secret (concealed, hidden, protected) become a secure note next to the item instead of landing in its plain notes. An entry the vault can't hold is skipped and counted instead of failing the import.
+- **Emergency export** — "Emergency export…" in the app, `kv export <file>` on the command line: an encrypted copy of the whole vault, in the vault's own format, under a separate password or a generated 32-character recovery code (about 158 bits, no look-alike characters) that is shown once to print. `kv restore <file>` makes a vault from it with a new master password. Exports never overwrite a file.
+
+### Changed
+
+- `kv import-passwords` takes any of the supported exports, and reports the format it found.
+- The desktop backend's `importCsv` method is now `importFile`.
+- The window can open a save dialog (`dialog:allow-save`), for the export.
+
 ## 0.7.0 — 2026-10-06
 
 ### Added

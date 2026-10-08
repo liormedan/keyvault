@@ -19,6 +19,8 @@ Everything below is the command line's public interface: commands, flags, exit c
 | `kv forget` | drop the remembered key |
 | `kv passwd` | change the master password (forgets the remembered key) |
 | `kv backup [dir]` | copy the encrypted file to `dir/vault_YYYY-MM-DD.kv` (default `KV_BACKUP_DIR`, else `~/.keyvault/backups`) |
+| `kv export <file> [--recovery-code]` | an encrypted copy under its own password (asked twice), or under a generated recovery code printed once to stderr. Never overwrites a file |
+| `kv restore <file> [--force]` | asks for the export's password or recovery code, then a new master password; writes the vault. `--force` replaces an existing vault (kept as `vault.kv.before-restore`) |
 | `kv status [--json]` | `{ version, vault, exists, remembered, lang }` |
 | `kv doctor` | setup checks (✓ / !) |
 | `kv lang <en\|he>` | interface language, saved in `~/.keyvault/config.json` |
@@ -34,7 +36,8 @@ Everything below is the command line's public interface: commands, flags, exit c
 | `kv mv <from> <to>` | rename `project/KEY` → `project/KEY`, or `project` → `project` |
 | `kv ls [project] [--json]` | `{ [project]: [{ key, note, updated, envs? }] }` |
 | `kv import <project> <file.env>` | import an env file (empty values skipped) |
-| `kv import-passwords <file.csv> [--delete]` | logins from a browser export |
+| `kv import-passwords <file> [--delete]` | a browser CSV, 1Password (`.1pux` or CSV), Bitwarden (unencrypted `.json`), KeePass (`.xml`) or LastPass export; the format is recognised from the content |
+| `kv audit [--breaches] [--json]` | password health: `{ checked, reused: [[item]], weak: [{ item, reason }], old: [item], no2fa: [item], breaches?: { checked, found: [{ count, items }] } }`, where `item` is `{ id, type, title, sub, fav, updated }` and `reason` is `common`, `repeated`, `short`, `digits` or `letters`. `--breaches` is the only network call kv makes: the first 5 hex characters of each password's SHA-1 go to `api.pwnedpasswords.com` |
 
 ## Projects
 

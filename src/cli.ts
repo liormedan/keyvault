@@ -8,7 +8,11 @@ import { completion, SHELLS, type Shell } from "./completion.ts";
 import { getLang } from "./i18n.ts";
 import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
-import { readLoginsFile } from "./import-csv.ts";
+import { breachReport } from "./breach.ts";
+import { canonicalCode, recoveryCode } from "./crypto.ts";
+import { healthReport } from "./health.ts";
+import { readImportFile } from "./import-file.ts";
+import type { ListedItem, Weakness } from "./model.ts";
 import { diff as diffValues, type Diff, githubSecretNames, type Platform, PLATFORMS, pullVercel, push, vercelTarget } from "./platforms.ts";
 import { findLeaks, hookInstalled, installHook, stagedLines, trackedLines, uninstallHook } from "./guard.ts";
 import { findProject, suggestName, writeProject } from "./project.ts";
@@ -226,17 +230,96 @@ const commands: Record<string, () => Promise<void>> = {
     const del = has("--delete");
     const file = args.shift();
     if (!file) throw new UsageError(t("cli.usage.importPasswords"));
-    const { logins, skipped } = readLoginsFile(file);
+    const parsed = readImportFile(file);
     const { key, data } = await unlock();
-    const { added, duplicates } = store.importLogins(data, logins);
+    const { added, duplicates, invalid } = store.importItems(data, parsed.items);
     if (added) await store.save(key, data);
-    err(t("cli.importedLogins", { added, duplicates, skipped }));
+    err(t("cli.importedItems", { format: parsed.format, added, duplicates, skipped: parsed.skipped + invalid }));
     if (del) {
       fs.rmSync(file, { force: true });
-      err(t("cli.csvDeleted"));
+      err(t("cli.importDeleted"));
     } else {
-      err(t("cli.csvPlain"));
+      err(t("cli.importPlain"));
     }
+  },
+
+  async audit() {
+    const asJson = json();
+    const breaches = has("--breaches");
+    if (args.length) throw new UsageError(t("cli.usage.audit"));
+    const { data } = await unlock();
+    const report = healthReport(data);
+    const found = breaches ? await breachReport(data) : undefined;
+    if (asJson) return console.log(JSON.stringify(found ? { ...report, breaches: found } : report, null, 2));
+    const name = (i: ListedItem) => `${i.title}${i.sub ? `  (${i.sub})` : ""}`;
+    const list = (rows: string[], max = 15) => {
+      for (const r of rows.slice(0, max)) console.log(`  ${r}`);
+      if (rows.length > max) console.log(t("audit.more", { n: rows.length - max }));
+    };
+    console.log(t("audit.title", { n: report.checked }));
+    if (found) {
+      console.log("");
+      if (found.found.length) {
+        console.log(t("audit.breaches", { n: found.found.length }));
+        list(found.found.map((f) => `${t("audit.seen", { count: f.count.toLocaleString() })}: ${f.items.map((i) => i.title).join(", ")}`));
+      } else console.log(t("audit.breachesNone", { n: found.checked }));
+      err(t("audit.breachNote"));
+    }
+    const section = (title: string) => console.log(`\n${title}`);
+    if (report.reused.length) {
+      section(t("audit.reused", { n: report.reused.length }));
+      list(report.reused.map((g) => `${g.length} × ${g.map((i) => i.title).join(", ")}`));
+    }
+    if (report.weak.length) {
+      section(t("audit.weak", { n: report.weak.length }));
+      list(report.weak.map((w) => `${name(w.item)} — ${t(`weak.${w.reason}` as `weak.${Weakness}`)}`));
+    }
+    if (report.old.length) {
+      section(t("audit.old", { n: report.old.length }));
+      list(report.old.map(name));
+    }
+    if (!report.reused.length && !report.weak.length && !report.old.length) section(t("audit.clean"));
+    section(t("audit.no2fa", { n: report.no2fa.length }));
+  },
+
+  async export() {
+    const withCode = has("--recovery-code");
+    const file = args.shift();
+    if (!file) throw new UsageError(t("cli.usage.export"));
+    const { data } = await unlock();
+    if (withCode) {
+      const code = await recoveryCode();
+      await store.exportTo(file, data, canonicalCode(code));
+      // The one place kv prints a secret to the terminal: the code exists to be written down
+      err(t("cli.recoveryCode", { path: path.resolve(file), code }));
+      return;
+    }
+    const a = await readHidden(t("cli.prompt.exportPw"));
+    if (!a) throw new Error(t("pw.empty"));
+    if (a !== (await readHidden(t("cli.prompt.again")))) throw new Error(t("pw.mismatch"));
+    await store.exportTo(file, data, a);
+    err(t("cli.exported", { path: path.resolve(file) }));
+  },
+
+  async restore() {
+    const force = has("--force");
+    const file = args.shift();
+    if (!file) throw new UsageError(t("cli.usage.restore"));
+    if (store.exists() && !force) throw new Error(t("restore.exists", { path: store.VAULT }));
+    const secret = await readHidden(t("cli.prompt.fileSecret", { file: path.basename(file) }));
+    const data = await store.openExport(file, secret);
+    const pw = await newPassword();
+    const before = `${store.VAULT}.before-restore`;
+    if (store.exists()) fs.renameSync(store.VAULT, before);
+    try {
+      const { key } = await store.create(pw);
+      await store.save(key, data);
+    } catch (e) {
+      if (fs.existsSync(before)) fs.renameSync(before, store.VAULT);
+      throw e;
+    }
+    await remember.forget();
+    err(t("cli.restored", { path: store.VAULT }));
   },
 
   async unlock() {

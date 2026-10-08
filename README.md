@@ -24,7 +24,10 @@ A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app tha
 - **Desktop app** (Tauri 2) — dark or light theme, categories, search, favorites, reveal / copy / edit / delete, auto-lock after 15 idle minutes.
 - **Typed items** — login, credit card, bank account, identity document, Wi-Fi, server/SSH, software license, secure note — plus dev keys grouped by project.
 - **Secrets stay hidden** — secret fields never appear in lists and reach the window only when you click reveal. Copy goes straight to the clipboard, is cleared after 20 seconds, and on Windows stays out of clipboard history and cloud sync. The vault locks when Windows locks.
-- **Import from browsers** — pick the password CSV exported by Chrome, Edge, Firefox or Safari (also Bitwarden, LastPass, 1Password). Duplicates are skipped, and the app offers to delete the plaintext export afterwards.
+- **Import from anywhere** — a browser's password CSV (Chrome, Edge, Firefox, Safari), or a password manager's export: 1Password (`.1pux` or CSV), Bitwarden (`.json`), KeePass (`.xml`), LastPass. Cards, notes and two-factor keys come along; duplicates are skipped, and the app offers to delete the plaintext export afterwards.
+- **Password health** — reused, weak and year-old passwords, and logins without two-factor, in one view (`kv audit` on the command line). An opt-in breach check asks [Have I Been Pwned](https://haveibeenpwned.com/Passwords) with only the first 5 characters of each password's SHA-1 hash.
+- **Two-factor codes** — paste a site's two-factor key (or `otpauth://` link) into a login and the app shows the current 6-digit code, ready to copy.
+- **Emergency export** — an encrypted copy of the whole vault under its own password, or under a recovery code you print. If you forget the master password, `kv restore` turns it back into a vault.
 - **Password generator** — 20 characters by default, randomness from libsodium.
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
 - **Remember me** — the derived key, not the password, goes to the system's own secret store: DPAPI on Windows, Keychain on macOS, Secret Service (GNOME Keyring / KWallet) on Linux.
@@ -116,7 +119,10 @@ kv init-project [name]                    # .kv.json in this folder
 kv example | kv check                     # .env.example from the vault / what the vault is missing
 kv mv my-app/OLD my-app/NEW               # rename a key (or kv mv old-project new-project)
 kv import my-app .env.local               # import an existing env file (empty values are skipped)
-kv import-passwords passwords.csv --delete   # logins from a browser export; --delete removes the plaintext CSV
+kv import-passwords export.1pux --delete  # browser CSV, 1Password, Bitwarden, KeePass, LastPass; --delete removes the plaintext file
+kv audit [--breaches] [--json]            # reused, weak and old passwords; --breaches asks Have I Been Pwned (hash prefixes only)
+kv export rescue.kv --recovery-code       # encrypted emergency copy; prints a recovery code once (or asks for a password)
+kv restore rescue.kv                      # a vault from an export, with a new master password
 kv backup [dir]                           # dated encrypted copy (default: KV_BACKUP_DIR or ~/.keyvault/backups)
 kv passwd                                 # change the master password
 kv forget                                 # drop "remember me"
@@ -140,7 +146,9 @@ What it protects against: someone who gets the vault file (a backup, a synced fo
 
 Importing from a browser goes through the browser's own export file on purpose: kv-vault never reads a browser's password database directly.
 
-What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. There is no master-password recovery, no sync and no browser autofill.
+The breach check is the only feature that uses the network, and only when you ask: each password's SHA-1 is computed locally and only its first 5 hex characters are sent ([k-anonymity](https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange)); the full hash is matched on your machine. Two-factor codes (HMAC-SHA1, RFC 6238) and that SHA-1 come from Node's `crypto` — they are protocol requirements libsodium doesn't offer; the vault's own encryption is libsodium only.
+
+What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. A forgotten master password can't be recovered — only an emergency export made beforehand gets you back in. There is no sync and no browser autofill yet.
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 

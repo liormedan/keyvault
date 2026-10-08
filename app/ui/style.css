@@ -93,4 +93,25 @@ code { font-family: ui-monospace, Consolas, monospace; background:var(--bg); pad
 #confirmText { margin:0; }
 .gate-links { display:flex; justify-content:center; gap:16px; }
 :root[dir="ltr"] .name { text-align:left; }
+.footer-links { display:flex; gap:16px; }
+.health-sum { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 16px; }
+.chip { font-size:13px; border:1px solid var(--line); border-radius:999px; padding:1px 10px; color:var(--muted); }
+.chip.warn { color:var(--danger); border-color:var(--danger); }
+section .lead { padding:10px 16px 0; }
+section .group { border-bottom:1px solid var(--line); padding:8px 0 4px; }
+section .group:last-child { border-bottom:0; }
+section .group > p.muted { padding:0 16px; font-size:13px; }
+.hrow { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:6px 16px; }
+.hrow .open { border:0; background:none; text-align:start; padding:0; min-height:0; display:grid; min-width:0; }
+.hrow .open:hover .title { color:var(--accent); }
+section .more { padding:6px 16px 10px; }
+section.breach > p.muted, section.breach .breach-out, section.breach .actions { padding:10px 16px; }
+section.breach .actions { justify-content:flex-start; }
+.breach-out p.bad { color:var(--danger); font-weight:600; margin:0; }
+.breach-out p.good { color:var(--accent); font-weight:600; margin:0; }
+.fields > .pair { display:grid; gap:12px; }
+.totp-code { font-size:20px; letter-spacing:.08em; flex:0 0 auto !important; }
+.totp-left { font-variant-numeric:tabular-nums; min-width:4em; }
+.recovery-code { font-family: ui-monospace, Consolas, monospace; font-size:18px; letter-spacing:.04em; background:var(--bg); border:1px dashed var(--line); border-radius:8px; padding:12px; margin:0; text-align:center; word-break:break-word; user-select:all; }
 .env-tag { font-family: system-ui, sans-serif; font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:0 7px; margin-inline-start:6px; }
+.fields .pair > div { display:grid; gap:2px; }

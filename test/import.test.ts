@@ -40,6 +40,7 @@ test("chrome export: columns by name, rows without a password skipped", () => {
   assert.equal(logins.length, 2);
   assert.equal(skipped, 1);
   assert.deepEqual(logins[1], {
+    type: "login",
     title: "Shop, Inc.",
     fields: { url: "https://shop.example/account", username: "dana", password: 'pa"ss,word', totp: "", notes: "line one\nline two" },
   });
@@ -60,9 +61,9 @@ test("a file that is not a password export is rejected", () => {
 
 test("import into the vault: de-duplicates across files and re-imports", async () => {
   const { key, data } = await store.create(PW);
-  assert.deepEqual(store.importLogins(data, csvToLogins(CHROME).logins), { added: 2, duplicates: 0 });
-  assert.deepEqual(store.importLogins(data, csvToLogins(FIREFOX).logins), { added: 1, duplicates: 1 });
-  assert.deepEqual(store.importLogins(data, csvToLogins(CHROME).logins), { added: 0, duplicates: 2 });
+  assert.deepEqual(store.importItems(data, csvToLogins(CHROME).logins), { added: 2, duplicates: 0, invalid: 0 });
+  assert.deepEqual(store.importItems(data, csvToLogins(FIREFOX).logins), { added: 1, duplicates: 1, invalid: 0 });
+  assert.deepEqual(store.importItems(data, csvToLogins(CHROME).logins), { added: 0, duplicates: 2, invalid: 0 });
   await store.save(key, data);
   const opened = await store.unlockWithPassword(PW);
   const list = store.listItems(opened.data);
@@ -71,19 +72,19 @@ test("import into the vault: de-duplicates across files and re-imports", async (
   assert.ok(!JSON.stringify(list).includes("pw-one"), "no passwords in the listing");
 });
 
-test("app backend: importCsv returns counts only; importCleanup deletes just that file", async () => {
+test("app backend: importFile returns counts only; importCleanup deletes just that file", async () => {
   const csv = path.join(HOME, "Chrome Passwords.csv");
   const other = path.join(HOME, "keep.txt");
   fs.writeFileSync(csv, FIREFOX + '\n"https://new.example","dana","pw-new",,"","{3}","1","2","3"\n');
   fs.writeFileSync(other, "keep");
   const backend = startBackend(HOME);
   const call = backend.call;
-  assert.equal((await call("importCsv", { path: csv })).error, "locked");
+  assert.equal((await call("importFile", { path: csv })).error, "locked");
   assert.match((await call("importCleanup")).error, /No file to delete/);
   await call("unlock", { password: PW });
-  assert.match((await call("importCsv", { path: path.join(HOME, "missing.csv") })).error, /File not found/);
-  const res = await call("importCsv", { path: csv });
-  assert.deepEqual(res.result, { added: 1, duplicates: 2, skipped: 0, file: "Chrome Passwords.csv" });
+  assert.match((await call("importFile", { path: path.join(HOME, "missing.csv") })).error, /File not found/);
+  const res = await call("importFile", { path: csv });
+  assert.deepEqual(res.result, { format: "CSV", added: 1, duplicates: 2, skipped: 0, file: "Chrome Passwords.csv" });
   assert.ok(!JSON.stringify(res).includes("pw-new"), "the reply carries no values");
   assert.equal((await call("importCleanup")).result.ok, true);
   assert.ok(!fs.existsSync(csv), "the imported CSV is deleted");

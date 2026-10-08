@@ -261,12 +261,12 @@ const stubbed = await page.evaluate((p) => {
 }, csvPath);
 if (stubbed !== true) throw new Error("cannot stub dialog: " + stubbed);
 await page.click("#add");
-await page.locator("#pickGrid button", { hasText: "ייבוא סיסמאות מדפדפן" }).click();
+await page.locator("#pickGrid button", { hasText: "ייבוא מדפדפן או ממנהל סיסמאות" }).click();
 await shot(page, "9-import");
-await dlg.getByRole("button", { name: "בחירת קובץ CSV" }).click();
+await dlg.getByRole("button", { name: "בחירת קובץ" }).click();
 await page.waitForSelector("#importResult");
 const importText = (await page.textContent("#importResult")) ?? "";
-if (!importText.includes("נוספו 2") || !importText.includes("1 שורות בלי סיסמה")) throw new Error("import result: " + importText);
+if (!importText.includes("CSV") || !importText.includes("נוספו 2") || !importText.includes("1 דולגו")) throw new Error("import result: " + importText);
 await shot(page, "10-import-done");
 if (((await page.locator("body").textContent()) ?? "").includes("csv-secret")) throw new Error("imported password visible in the page");
 await dlg.getByRole("button", { name: "מחיקת הקובץ" }).click();
@@ -275,6 +275,48 @@ if (fs.existsSync(csvPath)) throw new Error("csv not deleted");
 if ((await page.locator(".item").count()) !== 3) throw new Error("items after import: " + (await page.locator(".item").count()));
 await page.locator("#cats button", { hasText: "הכול" }).click();
 log("browser import: " + importText + " · file deleted");
+
+// ── Two-factor code ──
+await page.locator(".item", { hasText: "GitHub" }).locator(".open").click();
+await dlg.getByRole("button", { name: "עריכה" }).click();
+await dlg.locator("[name=totp]").fill("JBSWY3DPEHPK3PXP");
+await dlg.getByRole("button", { name: "שמירה" }).click();
+await page.waitForFunction(() => /^\d{3} \d{3}$/.test(document.querySelector("#itemDlg .totp-code")?.textContent ?? ""), null, { timeout: 10000 });
+const left = (await dlg.locator(".totp-left").textContent()) ?? "";
+if (!/^\d+ שנ׳$/.test(left)) throw new Error("totp countdown: " + left);
+if (((await dlg.textContent()) ?? "").includes("JBSWY3DPEHPK3PXP")) throw new Error("two-factor key shown unmasked");
+await shot(page, "11-totp");
+log("two-factor code shown, key stays masked");
+await dlg.getByRole("button", { name: "סגירה" }).click();
+
+// ── Password health ──
+await page.locator("#cats button", { hasText: "בריאות סיסמאות" }).click();
+await page.waitForSelector(".health-sum");
+const sum = (await page.textContent(".health-sum")) ?? "";
+if (!sum.includes("נבדקו 3 סיסמאות")) throw new Error("health summary: " + sum);
+const no2fa = await page.locator("section", { hasText: "התחברויות בלי אימות דו-שלבי" }).locator(".hrow").count();
+if (no2fa !== 2) throw new Error("logins without two-factor: " + no2fa);
+const healthText = (await page.textContent("#list")) ?? "";
+if (healthText.includes("csv-secret") || healthText.includes(genPw)) throw new Error("a password in the health view");
+await shot(page, "12-health");
+log("password health: " + sum);
+await page.locator("#cats button", { hasText: "הכול" }).click();
+
+// ── Emergency export (the save picker is replaced with a fixed path) ──
+const exportPath = path.join(HOME, "rescue.kv");
+await page.evaluate((p) => {
+  window.__TAURI__.dialog.save = async () => p;
+}, exportPath);
+await page.click("#exportBtn");
+await dlg.getByRole("button", { name: "בחירת מקום לשמירה" }).click();
+await page.waitForSelector("#recoveryCode");
+const code = (await page.textContent("#recoveryCode")) ?? "";
+if (!/^([A-Z2-9]{4}-){7}[A-Z2-9]{4}$/.test(code)) throw new Error("recovery code: " + code);
+const exported = JSON.parse(fs.readFileSync(exportPath, "utf8"));
+if (!exported.ct || !exported.kdf || JSON.stringify(exported).includes("csv-secret")) throw new Error("export is not an encrypted vault file");
+await shot(page, "13-export");
+log("emergency export with a recovery code");
+await dlg.getByRole("button", { name: "סגירה" }).click();
 
 await page.locator(".row", { hasText: "SMTP_PASS" }).getByRole("button", { name: "מחיקה" }).click();
 await page.locator("#confirmDlg button[value=cancel]").click();

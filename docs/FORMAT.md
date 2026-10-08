@@ -59,6 +59,10 @@ A new random nonce is used for every save.
 
 Item types and their fields are defined in [`src/types.ts`](../src/types.ts). Readers should treat missing `items` and `envs` as empty — vaults from earlier versions don't have them.
 
+## Emergency export
+
+`kv export` and the app's emergency export write a file in exactly this format, sealed under the export's own password with fresh KDF parameters (new salt). With a recovery code, the password is the code without its dashes, in upper case: 32 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, generated with libsodium's `randombytes_uniform`. The plaintext is the same JSON as the vault's. `kv restore` reads it and writes a new vault under a new master password.
+
 ## Remember me
 
 Not part of the vault file. The 32-byte derived key is stored by the OS: `~/.keyvault/key.dpapi` on Windows (`{ "salt", "blob" }`, DPAPI `CurrentUser`), or the system keychain (service `kv-vault`, account `vault-<salt>`) with a `key.keychain` marker on macOS and Linux. The salt ties it to one vault: a new vault (or a changed master password) invalidates it.
