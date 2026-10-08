@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0 — 2026-10-08
+
+### Added
+
+- **Browser extension** for Chrome, Edge and Firefox (`extension/`, built to `dist/extension/`). Click it — or press Ctrl+Shift+L — on a sign-in page to see the logins kv-vault has for that site and fill them; copy a password or a two-factor code; generate a password straight to the clipboard. When you submit a sign-in, the extension offers "Save to kv-vault" (or "Update the password") the next time you open it.
+- **Native messaging host** (`src/host.ts`): the browser starts it and talks to it over stdin/stdout — no port, no server. It answers only the kv-vault extension (checked by origin), only while you've turned it on, and only with logins for the page's own site; there is no call that lists the vault. It re-reads the vault on every request, so saving from the browser never overwrites a change made in the app meanwhile, and it exits after 5 idle minutes.
+- **Site matching** (`src/site.ts`) by registrable domain: `mail.google.com` and `accounts.google.com` share logins; `accounts.google.com.evil.example`, `paypa1.com`, another `*.co.il` or another `*.vercel.app` don't; an https login is never offered to an http page.
+- **"Browser extension…"** in the app (and `kv browser [status|enable|disable]`): off until you turn it on. Turning it on registers the host with Chrome, Edge, Chromium and Firefox (HKCU on Windows, the browsers' NativeMessagingHosts folders on macOS and Linux), and shows where to load the extension from until it's in the stores.
+- A CI job that runs the extension in a real Chromium against the host: list, fill, notice a new password on submit, update it in the vault, and give nothing to another host.
+
 ## 0.8.0 — 2026-10-08
 
 The first release aimed at everyday use, not only developers' keys.

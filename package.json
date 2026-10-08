@@ -1,6 +1,6 @@
 {
   "name": "kv-vault",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "A local, encrypted vault for developer keys and passwords — one file, a Tauri desktop app and a CLI. libsodium only.",
   "license": "MIT",
   "author": "Lior Medan",
@@ -31,6 +31,7 @@
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --test test/*.test.ts",
     "test:coverage": "node --experimental-strip-types --no-warnings=ExperimentalWarning --experimental-test-coverage --test-coverage-exclude=test/** --test-coverage-lines=75 --test test/*.test.ts",
     "test:e2e": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/e2e/app.e2e.ts",
+    "test:extension": "node --experimental-strip-types --no-warnings=ExperimentalWarning test/e2e/extension.e2e.ts",
     "prepare": "node scripts/build.mjs",
     "app:build": "tauri build --no-bundle",
     "app:installer": "tauri build",

@@ -17,6 +17,6 @@
     "noUncheckedIndexedAccess": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "app/ui", "test", "scripts"],
+  "include": ["src", "app/ui", "extension", "test", "scripts"],
   "exclude": ["node_modules", "dist", "app/ui/dist", "app/src-tauri"]
 }

@@ -9,6 +9,7 @@ import { getLang } from "./i18n.ts";
 import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { breachReport } from "./breach.ts";
+import { browserStatus, bundledHost, disableBrowser, enableBrowser } from "./browser-setup.ts";
 import { canonicalCode, recoveryCode } from "./crypto.ts";
 import { healthReport } from "./health.ts";
 import { readImportFile } from "./import-file.ts";
@@ -241,6 +242,21 @@ const commands: Record<string, () => Promise<void>> = {
     } else {
       err(t("cli.importPlain"));
     }
+  },
+
+  async browser() {
+    const asJson = json();
+    const sub = args.shift() ?? "status";
+    if (!["status", "enable", "disable"].includes(sub)) throw new UsageError(t("cli.usage.browser"));
+    let st = browserStatus();
+    if (sub === "enable") {
+      const hostScript = bundledHost();
+      if (!hostScript) throw new Error(t("browser.noHost"));
+      st = enableBrowser({ hostScript });
+    } else if (sub === "disable") st = disableBrowser();
+    if (asJson) return console.log(JSON.stringify(st, null, 2));
+    console.log(st.enabled ? t("browser.on", { browsers: st.registered.join(", ") || "—" }) : t("browser.off"));
+    if (st.enabled && st.chromeExtension) console.log(t("browser.load", { dir: st.chromeExtension }));
   },
 
   async audit() {

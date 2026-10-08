@@ -318,6 +318,14 @@ await shot(page, "13-export");
 log("emergency export with a recovery code");
 await dlg.getByRole("button", { name: "סגירה" }).click();
 
+// ── Browser extension dialog (not turned on: that would register the host for this user) ──
+await page.click("#browserBtn");
+await page.waitForSelector("#browserState");
+if ((await page.textContent("#browserState")) !== "כבוי") throw new Error("browser extension should start off: " + (await page.textContent("#browserState")));
+await shot(page, "14-browser");
+log("browser extension: off by default");
+await dlg.getByRole("button", { name: "סגירה" }).click();
+
 await page.locator(".row", { hasText: "SMTP_PASS" }).getByRole("button", { name: "מחיקה" }).click();
 await page.locator("#confirmDlg button[value=cancel]").click();
 await sleep(400);

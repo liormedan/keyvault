@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { breachReport } from "./breach.ts";
+import { browserStatus, bundledHost, disableBrowser, enableBrowser } from "./browser-setup.ts";
 import { canonicalCode, randomPassword, recoveryCode, wipe } from "./crypto.ts";
 import { healthReport } from "./health.ts";
 import * as remember from "./remember.ts";
@@ -191,6 +192,16 @@ const methods = {
     await store.exportTo(String(file || ""), data, password ? String(password) : canonicalCode(code!));
     return code ? { code } : {};
   },
+
+  browserStatus: () => browserStatus(),
+
+  browserEnable() {
+    const hostScript = bundledHost();
+    if (!hostScript) throw new Error(t("browser.noHost"));
+    return enableBrowser({ hostScript });
+  },
+
+  browserDisable: () => disableBrowser(),
 
   generate: async ({ length, symbols }) => ({ value: await randomPassword(length, { symbols: symbols !== false }) }),
 } satisfies Handlers;
