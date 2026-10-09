@@ -89,7 +89,6 @@ test("sync through a folder: two computers, conflicted copies merged and removed
   const created = await sync.link(cloud, a.key, a.data);
   assert.equal(created.mode, "created");
   const synced = path.join(cloud, sync.SYNC_FILE);
-  assert.ok(fs.existsSync(synced));
   assert.ok(!fs.readFileSync(synced, "utf8").includes("secret-from-a"), "the folder holds ciphertext");
   assert.equal(JSON.parse(fs.readFileSync(synced, "utf8")).kdf.salt, store.header().kdf.salt, "same header as the vault");
   assert.ok(a.data.sync?.lastSync, "lastSync recorded in this computer's vault");
