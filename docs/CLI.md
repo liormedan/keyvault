@@ -38,6 +38,11 @@ Everything below is the command line's public interface: commands, flags, exit c
 | `kv import <project> <file.env>` | import an env file (empty values skipped) |
 | `kv import-passwords <file> [--delete]` | a browser CSV, 1Password (`.1pux` or CSV), Bitwarden (unencrypted `.json`), KeePass (`.xml`) or LastPass export; the format is recognised from the content |
 | `kv browser [status\|enable\|disable] [--json]` | the browser extension's link to this computer: `{ enabled, registered: [browser], chromeId, firefoxId, chromeExtension, firefoxExtension }`. `enable` registers the native messaging host with Chrome, Edge, Chromium and Firefox; `disable` removes it |
+| `kv sync link <folder>` | start syncing through a folder: copies the vault there, merges with the vault already there, or — if it holds another vault — asks for that vault's master password and joins it |
+| `kv sync [now\|status\|off] [--json]` | sync now (`{ at, conflicts, copies }`), show the folder and last sync, or stop (the folder's files stay) |
+| `kv share key` | print this vault's sharing key (`kvpk1.…`, public) |
+| `kv share <project/KEY ...> --to <key> [--out file]` · `kv share --item <title\|id> --to <key> [--out file]` | seal dev keys or an item for one person into a `.kvshare` file (never overwrites) |
+| `kv receive <file.kvshare>` | add what was shared with this vault; existing dev keys are kept |
 | `kv audit [--breaches] [--json]` | password health: `{ checked, reused: [[item]], weak: [{ item, reason }], old: [item], no2fa: [item], breaches?: { checked, found: [{ count, items }] } }`, where `item` is `{ id, type, title, sub, fav, updated }` and `reason` is `common`, `repeated`, `short`, `digits` or `letters`. `--breaches` is the only network call kv makes: the first 5 hex characters of each password's SHA-1 go to `api.pwnedpasswords.com` |
 
 ## Projects

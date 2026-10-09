@@ -44,6 +44,8 @@ export interface Item {
   title: string;
   fields: Fields;
   fav: boolean;
+  /** when the star was last toggled — sync compares it with `updated` so a star alone travels too (0.10) */
+  favAt?: string;
   created: string;
   updated: string;
 }
@@ -54,6 +56,12 @@ export interface VaultData {
   projects: Record<string, Record<string, DevEntry>>;
   /** id → item */
   items: Record<string, Item>;
+  /** deletions, so sync can tell "deleted here" from "never seen here": "item:<id>" or "dev:<project>/<key>" → when (0.10) */
+  deleted: Record<string, string>;
+  /** this computer's sync state — never written to the sync folder (0.10) */
+  sync?: { lastSync?: string };
+  /** this vault's key pair for receiving shared items (libsodium crypto_box, base64) — made on first use (0.10) */
+  identity?: { publicKey: string; secretKey: string };
 }
 
 // ── Item types (src/types.js) ──

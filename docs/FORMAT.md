@@ -59,6 +59,14 @@ A new random nonce is used for every save.
 
 Item types and their fields are defined in [`src/types.ts`](../src/types.ts). Readers should treat missing `items` and `envs` as empty — vaults from earlier versions don't have them.
 
+## Sync folder
+
+`kv-vault.kv` in the sync folder is the same format with the same header (and so the same key) as the vault, minus `sync` in the plaintext. `kv-vault.kv.bak` is its previous version and `kv-vault.lock` a short-lived lock. Fields added in 0.10 to the plaintext: `deleted` (`"item:<id>"` / `"dev:<project>/<key>"` → ISO time), `favAt` on items, `sync: { lastSync }` (this computer only), `identity: { publicKey, secretKey }` (X25519, base64).
+
+## Share files
+
+`.kvshare`: `{ "kind": "kv-vault-share", "v": 1, "to": <base64url of the first 9 bytes of BLAKE2b-128 of the recipient's public key>, "sealed": <base64 crypto_box_seal of the JSON payload> }`. Payload: `{ v: 1, at, items: [{ type, title, fields }], dev: [{ project, key, value, note }] }`. A sharing key reads `kvpk1.<base64url public key>.<base64url of the first 3 bytes of BLAKE2b-128 of it>`.
+
 ## Emergency export
 
 `kv export` and the app's emergency export write a file in exactly this format, sealed under the export's own password with fresh KDF parameters (new salt). With a recovery code, the password is the code without its dashes, in upper case: 32 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, generated with libsodium's `randombytes_uniform`. The plaintext is the same JSON as the vault's. `kv restore` reads it and writes a new vault under a new master password.

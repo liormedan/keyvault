@@ -3,6 +3,7 @@
 // so a wrong method name or a missing parameter fails at compile time instead of at runtime.
 import type { BreachReport, Fields, HealthReport, ItemTypeName, Lang, ListedDevKey, ListedItem, MaskedItem, TypeDef } from "./model.ts";
 import type { BrowserStatus } from "./browser-setup.ts";
+import type { LinkResult, SyncResult, SyncStatus } from "./sync.ts";
 import type { TotpCode } from "./totp.ts";
 
 /** The error string for "the vault is locked" — the window shows the unlock screen on it */
@@ -80,6 +81,21 @@ export interface Methods {
   browserStatus: { params: None; result: BrowserStatus };
   browserEnable: { params: None; result: BrowserStatus };
   browserDisable: { params: None; result: BrowserStatus };
+
+  // sync through a folder the user already syncs
+  /** `revision` goes up whenever a sync changed what the window shows — the window reloads on a change */
+  syncStatus: { params: None; result: SyncStatus & { revision: number } };
+  /** error "sync.needPassword": the folder holds another vault — ask for its master password and call again */
+  syncLink: { params: { folder: string; password?: string }; result: { mode: LinkResult["mode"] } };
+  syncNow: { params: None; result: SyncResult };
+  syncUnlink: { params: None; result: Ok };
+
+  // sharing: sealed to one person's sharing key, as a .kvshare file
+  shareKey: { params: None; result: { key: string } };
+  shareItem: { params: { id: string; to: string; path: string }; result: Ok };
+  /** opens the file and keeps it until receiveAccept; returns names only */
+  receiveOpen: { params: { path: string }; result: { items: { type: ItemTypeName; title: string }[]; dev: string[]; at: string } };
+  receiveAccept: { params: None; result: { added: number; duplicates: number; devAdded: number; devSkipped: number } };
 }
 
 export type Method = keyof Methods;

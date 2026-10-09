@@ -123,6 +123,34 @@ const EN = {
   "browser.off": "Browser extension: off. Turn it on with: kv browser enable",
   "browser.load": "Load the extension: chrome://extensions or edge://extensions → Developer mode → Load unpacked → {dir}",
   "cli.usage.browser": "Usage: kv browser [status|enable|disable] [--json]",
+  "sync.conflictTitle": "{title} (conflict {date})",
+  "sync.unreadable": "{file} in the sync folder isn't a kv-vault file",
+  "sync.folderGone": "The sync folder isn't reachable: {folder}",
+  "sync.notFolder": "Not a folder: {folder}",
+  "sync.busy": "Another kv-vault process is syncing right now — try again in a moment",
+  "sync.off": "Sync is off. Choose a folder first",
+  "sync.otherVault": "The sync folder holds a vault with a different master password. Link the folder again to join it.",
+  "share.badKey": "That isn't a kv-vault sharing key (kvpk1.…). Ask for it again — it may be cut off",
+  "share.notShare": "Not a kv-vault share file",
+  "share.notForYou": "This share file was made for someone else's sharing key",
+  "share.noItem": "No item titled “{title}”",
+  "share.manyItems": "{n} items are titled “{title}” — use the id: {ids}",
+  "cli.usage.sync": "Usage: kv sync [now|status|off] [--json]   ·   kv sync link <folder>",
+  "cli.usage.share": "Usage: kv share key   ·   kv share <project/KEY ...> --to <key> [--out file]   ·   kv share --item <title|id> --to <key> [--out file]",
+  "cli.usage.receive": "Usage: kv receive <file.kvshare>",
+  "cli.sync.done": "Synced with {folder}{conflicts}",
+  "cli.sync.conflicts": " — {n} conflicts kept as “(conflict …)” copies",
+  "cli.sync.created": "Sync is on: the vault was copied to {folder}. Link the same folder on your other computers.",
+  "cli.sync.joined": "Joined the vault in {folder}. This computer now uses that vault's master password.",
+  "cli.sync.off": "Sync is off. The files in the folder were left as they are.",
+  "cli.sync.status": "Sync folder: {folder}\nLast sync: {last}",
+  "cli.sync.never": "never",
+  "cli.sync.none": "Sync is off. Turn it on with: kv sync link <folder in Drive / Dropbox / OneDrive>",
+  "cli.prompt.otherVault": "The folder holds another vault. Its master password: ",
+  "cli.share.key": "Your sharing key — send it to people who want to send you items (it's public; it can't open anything):\n\n  {key}",
+  "cli.share.done": "Sealed for that key: {file}\nSend the file any way you like. Only the vault with that sharing key can open it.",
+  "cli.received": "Added {items} items and {dev} dev keys{skipped}.",
+  "cli.receivedSkipped": " ({n} already here, skipped)",
   "weak.common": "very common",
   "weak.repeated": "one repeated character",
   "weak.short": "shorter than 8 characters",
@@ -159,6 +187,9 @@ const EN = {
   kv import-passwords <file> [--delete]   import from a browser CSV, 1Password, Bitwarden, KeePass or LastPass export
   kv audit [--breaches] [--json]   reused, weak and old passwords; --breaches: check known breaches (hash prefixes only)
   kv browser [status|enable|disable]   connect the kv-vault browser extension (off until enabled)
+  kv sync link <folder> | now | status | off   sync through a folder you already sync (Drive, Dropbox, OneDrive)
+  kv share key | <project/KEY> --to <key> | --item <title> --to <key>   seal items for one person (.kvshare file)
+  kv receive <file.kvshare>        add what someone shared with you
   kv ui                            browser window to view, search and edit (local only)
   kv unlock --remember             remember the vault for this Windows user (no password each time)
   kv forget                        drop the remembered key
@@ -384,6 +415,34 @@ const HE: Record<MessageKey, string> = {
   "browser.off": "תוסף הדפדפן: כבוי. להפעלה: kv browser enable",
   "browser.load": "טעינת התוסף: chrome://extensions או edge://extensions ← מצב מפתח ← Load unpacked ← {dir}",
   "cli.usage.browser": "שימוש: kv browser [status|enable|disable] [--json]",
+  "sync.conflictTitle": "{title} (התנגשות {date})",
+  "sync.unreadable": "{file} בתיקיית הסנכרון אינו קובץ של kv-vault",
+  "sync.folderGone": "אין גישה לתיקיית הסנכרון: {folder}",
+  "sync.notFolder": "זו לא תיקייה: {folder}",
+  "sync.busy": "תהליך אחר של kv-vault מסנכרן עכשיו — נסה שוב עוד רגע",
+  "sync.off": "הסנכרון כבוי. בחר תיקייה קודם",
+  "sync.otherVault": "בתיקיית הסנכרון יש כספת עם סיסמת אב אחרת. קשר את התיקייה שוב כדי להצטרף אליה.",
+  "share.badKey": "זה לא מפתח שיתוף של kv-vault ‏(kvpk1.…). בקש אותו שוב — אולי הוא נחתך",
+  "share.notShare": "זה לא קובץ שיתוף של kv-vault",
+  "share.notForYou": "קובץ השיתוף הזה נוצר למפתח שיתוף של מישהו אחר",
+  "share.noItem": "אין פריט בשם ״{title}״",
+  "share.manyItems": "{n} פריטים בשם ״{title}״ — השתמש במזהה: {ids}",
+  "cli.usage.sync": "שימוש: kv sync [now|status|off] [--json]   ·   kv sync link <תיקייה>",
+  "cli.usage.share": "שימוש: kv share key   ·   kv share <פרויקט/מפתח ...> --to <מפתח> [--out קובץ]   ·   kv share --item <שם|מזהה> --to <מפתח> [--out קובץ]",
+  "cli.usage.receive": "שימוש: kv receive <קובץ.kvshare>",
+  "cli.sync.done": "סונכרן עם {folder}{conflicts}",
+  "cli.sync.conflicts": " — {n} התנגשויות נשמרו כעותקים ״(התנגשות …)״",
+  "cli.sync.created": "הסנכרון פעיל: הכספת הועתקה אל {folder}. קשר את אותה תיקייה במחשבים האחרים שלך.",
+  "cli.sync.joined": "הצטרפת לכספת שב-{folder}. מעכשיו המחשב הזה משתמש בסיסמת האב שלה.",
+  "cli.sync.off": "הסנכרון כבוי. הקבצים בתיקייה נשארו כמו שהם.",
+  "cli.sync.status": "תיקיית סנכרון: {folder}\nסנכרון אחרון: {last}",
+  "cli.sync.never": "אף פעם",
+  "cli.sync.none": "הסנכרון כבוי. להפעלה: kv sync link <תיקייה ב-Drive / Dropbox / OneDrive>",
+  "cli.prompt.otherVault": "בתיקייה יש כספת אחרת. סיסמת האב שלה: ",
+  "cli.share.key": "מפתח השיתוף שלך — שלח אותו למי שרוצה לשלוח לך פריטים (הוא ציבורי; אי אפשר לפתוח איתו כלום):\n\n  {key}",
+  "cli.share.done": "נחתם למפתח הזה: {file}\nשלח את הקובץ בכל דרך. רק הכספת עם מפתח השיתוף הזה יכולה לפתוח אותו.",
+  "cli.received": "נוספו {items} פריטים ו-{dev} מפתחות פיתוח{skipped}.",
+  "cli.receivedSkipped": " ({n} כבר היו, דולגו)",
   "weak.common": "נפוצה מאוד",
   "weak.repeated": "תו אחד שחוזר",
   "weak.short": "קצרה מ-8 תווים",
@@ -420,6 +479,9 @@ const HE: Record<MessageKey, string> = {
   kv import-passwords <קובץ> [--delete]   ייבוא מ-CSV של דפדפן, 1Password, ‏Bitwarden, ‏KeePass או LastPass
   kv audit [--breaches] [--json]   סיסמאות חוזרות, חלשות וישנות; ‎--breaches: בדיקת דליפות (רק תחילית של hash)
   kv browser [status|enable|disable]   חיבור תוסף הדפדפן של kv-vault (כבוי עד שמפעילים)
+  kv sync link <תיקייה> | now | status | off   סנכרון דרך תיקייה שכבר מסונכרנת (Drive, Dropbox, OneDrive)
+  kv share key | <פרויקט/מפתח> --to <מפתח> | --item <שם> --to <מפתח>   חתימת פריטים לאדם אחד (קובץ ‎.kvshare)
+  kv receive <קובץ.kvshare>      הוספת מה ששיתפו איתך
   kv ui                          חלון לצפייה, חיפוש ועריכה (נפתח בדפדפן, מקומי בלבד)
   kv unlock --remember           זכירת הכספת למשתמש הזה ב-Windows (בלי להקליד סיסמה כל פעם)
   kv forget                      ביטול הזכירה

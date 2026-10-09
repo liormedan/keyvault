@@ -9,6 +9,8 @@ import { getLang } from "./i18n.ts";
 import * as remember from "./remember.ts";
 import { saveLang, t } from "./i18n.ts";
 import { breachReport } from "./breach.ts";
+import { ensureIdentity, makeShare, openShare, shareKeyOf } from "./share.ts";
+import * as sync from "./sync.ts";
 import { browserStatus, bundledHost, disableBrowser, enableBrowser } from "./browser-setup.ts";
 import { canonicalCode, recoveryCode } from "./crypto.ts";
 import { healthReport } from "./health.ts";
@@ -20,6 +22,9 @@ import { findProject, suggestName, writeProject } from "./project.ts";
 import { scan } from "./scan.ts";
 import { copyWithClear, readHidden, readStdin } from "./io.ts";
 import * as store from "./store.ts";
+
+// Every save also syncs, when a sync folder is configured
+sync.enableAutoSync();
 
 const argv = process.argv.slice(2);
 const cmd = argv.shift();
@@ -257,6 +262,91 @@ const commands: Record<string, () => Promise<void>> = {
     if (asJson) return console.log(JSON.stringify(st, null, 2));
     console.log(st.enabled ? t("browser.on", { browsers: st.registered.join(", ") || "—" }) : t("browser.off"));
     if (st.enabled && st.chromeExtension) console.log(t("browser.load", { dir: st.chromeExtension }));
+  },
+
+  async sync() {
+    const asJson = json();
+    const sub = args.shift() ?? "now";
+    if (sub === "status") {
+      const st = sync.syncStatus((await unlockQuietly())?.data);
+      if (asJson) return console.log(JSON.stringify(st, null, 2));
+      return console.log(st.folder ? t("cli.sync.status", { folder: st.folder, last: st.lastSync ?? t("cli.sync.never") }) : t("cli.sync.none"));
+    }
+    if (sub === "off") {
+      sync.unlink();
+      err(t("cli.sync.off"));
+      return;
+    }
+    if (sub === "link") {
+      const folder = args.shift();
+      if (!folder) throw new UsageError(t("cli.usage.sync"));
+      const s = await unlock();
+      let res: sync.LinkResult;
+      try {
+        res = await sync.link(path.resolve(folder), s.key, s.data);
+      } catch (e) {
+        if ((e as Error).message !== "sync.needPassword") throw e;
+        res = await sync.link(path.resolve(folder), s.key, s.data, await readHidden(t("cli.prompt.otherVault")));
+      }
+      if (res.key && remember.remembered()) await remember.remember(res.key, store.salt());
+      err(
+        t(res.mode === "joined" ? "cli.sync.joined" : res.mode === "created" ? "cli.sync.created" : "cli.sync.done", {
+          folder: path.resolve(folder),
+          conflicts: "",
+        }),
+      );
+      return;
+    }
+    if (sub !== "now") throw new UsageError(t("cli.usage.sync"));
+    const folder = sync.syncFolder();
+    if (!folder) throw new Error(t("cli.sync.none"));
+    const s = await unlock();
+    const res = await sync.syncNow(s.key, s.data);
+    if (asJson) return console.log(JSON.stringify(res, null, 2));
+    err(t("cli.sync.done", { folder, conflicts: res.conflicts ? t("cli.sync.conflicts", { n: res.conflicts }) : "" }));
+  },
+
+  async share() {
+    const to = flag("--to");
+    const out = flag("--out");
+    const itemRef = flag("--item");
+    const refs = args.splice(0);
+    const { key, data } = await unlock();
+    if (refs[0] === "key" && !to) {
+      if ((await ensureIdentity(data)).created) await store.save(key, data);
+      return console.log(t("cli.share.key", { key: await shareKeyOf(data.identity!.publicKey) }));
+    }
+    if (!to || (!itemRef && !refs.length)) throw new UsageError(t("cli.usage.share"));
+    const items = [];
+    if (itemRef) {
+      const byId = data.items[itemRef];
+      const named = byId ? [byId] : Object.values(data.items).filter((i) => i.title === itemRef);
+      if (!named.length) throw new Error(t("share.noItem", { title: itemRef }));
+      if (named.length > 1) throw new Error(t("share.manyItems", { n: named.length, title: itemRef, ids: named.map((i) => i.id).join(", ") }));
+      items.push({ type: named[0]!.type, title: named[0]!.title, fields: named[0]!.fields });
+    }
+    const dev = refs.map((r) => {
+      const [p, k] = store.parseRef(r);
+      const e = store.getEntry(data, p, k);
+      return { project: p, key: k, value: e.value, note: e.note };
+    });
+    const name = (itemRef ? (items[0]?.title ?? "share") : refs.length === 1 ? refs[0]!.replace("/", "-") : "kv-share").replace(/[\\/:*?"<>|]+/g, "-");
+    const file = path.resolve(out ?? `${name}.kvshare`);
+    fs.writeFileSync(file, await makeShare(to, items, dev), { flag: "wx", mode: 0o600 });
+    err(t("cli.share.done", { file }));
+  },
+
+  async receive() {
+    const file = args.shift();
+    if (!file) throw new UsageError(t("cli.usage.receive"));
+    const { key, data } = await unlock();
+    if ((await ensureIdentity(data)).created) await store.save(key, data);
+    const got = await openShare(fs.readFileSync(file, "utf8"), data.identity);
+    const { added, duplicates, invalid } = store.importItems(data, got.items);
+    const dev = store.addSharedDev(data, got.dev);
+    if (added || dev.added) await store.save(key, data);
+    const skipped = duplicates + invalid + dev.skipped;
+    err(t("cli.received", { items: added, dev: dev.added, skipped: skipped ? t("cli.receivedSkipped", { n: skipped }) : "" }));
   },
 
   async audit() {
