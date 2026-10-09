@@ -11,6 +11,7 @@ import { runCliFull } from "./helpers.ts";
 
 const vault: VaultData = {
   created: "",
+  deleted: {},
   projects: {
     web: {
       API_KEY: { value: "sk_live_0123456789", note: "", updated: "", envs: { prod: { value: "prod-secret-value-42", updated: "" } } },

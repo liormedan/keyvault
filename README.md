@@ -28,6 +28,8 @@ A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app tha
 - **Password health** — reused, weak and year-old passwords, and logins without two-factor, in one view (`kv audit` on the command line). An opt-in breach check asks [Have I Been Pwned](https://haveibeenpwned.com/Passwords) with only the first 5 characters of each password's SHA-1 hash.
 - **Two-factor codes** — paste a site's two-factor key (or `otpauth://` link) into a login and the app shows the current 6-digit code, ready to copy.
 - **Browser extension** — Chrome, Edge and Firefox: fill the login for the site you're on, copy a two-factor code, save a sign-in you just submitted. It talks to this computer only (native messaging, no port, no account), only for the page's own site, and only once you turn it on in the app.
+- **Sync without a server** — choose a folder your cloud already syncs (Drive, Dropbox, OneDrive, iCloud); kv-vault keeps an encrypted copy there and merges changes item by item. Edits on two computers at once keep both versions.
+- **Share with one person** — seal an item or a dev key to someone's sharing key into a `.kvshare` file; only their vault can open it.
 - **Emergency export** — an encrypted copy of the whole vault under its own password, or under a recovery code you print. If you forget the master password, `kv restore` turns it back into a vault.
 - **Password generator** — 20 characters by default, randomness from libsodium.
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
@@ -123,6 +125,10 @@ kv import my-app .env.local               # import an existing env file (empty v
 kv import-passwords export.1pux --delete  # browser CSV, 1Password, Bitwarden, KeePass, LastPass; --delete removes the plaintext file
 kv audit [--breaches] [--json]            # reused, weak and old passwords; --breaches asks Have I Been Pwned (hash prefixes only)
 kv browser enable                         # connect the browser extension (off until enabled); status / disable
+kv sync link ~/Dropbox/kv                 # sync through a folder you already sync; kv sync / status / off
+kv share key                              # your sharing key (public) — give it to people who send you items
+kv share my-app/API_KEY --to kvpk1.…      # seal a key (or --item <title>) for one person into a .kvshare file
+kv receive API_KEY.kvshare                # add what someone shared with you
 kv export rescue.kv --recovery-code       # encrypted emergency copy; prints a recovery code once (or asks for a password)
 kv restore rescue.kv                      # a vault from an export, with a new master password
 kv backup [dir]                           # dated encrypted copy (default: KV_BACKUP_DIR or ~/.keyvault/backups)
@@ -152,7 +158,7 @@ The browser extension reaches the vault through a native messaging host the brow
 
 The breach check is the only feature that uses the network, and only when you ask: each password's SHA-1 is computed locally and only its first 5 hex characters are sent ([k-anonymity](https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange)); the full hash is matched on your machine. Two-factor codes (HMAC-SHA1, RFC 6238) and that SHA-1 come from Node's `crypto` — they are protocol requirements libsodium doesn't offer; the vault's own encryption is libsodium only.
 
-What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. A forgotten master password can't be recovered — only an emergency export made beforehand gets you back in. There is no sync yet.
+What it does **not** protect against: malware running as your user while the vault is unlocked, or anyone logged in as your Windows user when "remember me" is on. A forgotten master password can't be recovered — only an emergency export made beforehand gets you back in. Sync goes through a folder you already sync: what the cloud stores is the same ciphertext as the vault file. Shared items travel as libsodium sealed boxes to the recipient's public key; the sender is anonymous, so the app shows what a share file contains before adding it.
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.
 

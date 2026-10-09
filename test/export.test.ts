@@ -34,7 +34,7 @@ test("recovery code: 32 unambiguous characters in groups of four; typed in any c
   const code = await recoveryCode();
   assert.match(code, /^([A-HJKMNP-Z2-9]{4}-){7}[A-HJKMNP-Z2-9]{4}$/);
   assert.notEqual(code, await recoveryCode());
-  const data = { created: new Date().toISOString(), projects: {}, items: {} };
+  const data = { created: new Date().toISOString(), projects: {}, items: {}, deleted: {} };
   store.setEntry(data, "demo", "API_KEY", "export-secret-2");
   await store.exportTo(out("code.kv"), data, canonicalCode(code));
   for (const typed of [code, code.toLowerCase(), code.replace(/-/g, ""), code.replace(/-/g, " ")]) {

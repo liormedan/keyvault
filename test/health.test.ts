@@ -7,7 +7,7 @@ import { saveItem } from "../src/store.ts";
 
 // In-memory vault data only — no file, no network. All passwords here are made up.
 function vault(): VaultData {
-  const data: VaultData = { created: new Date().toISOString(), projects: {}, items: {} };
+  const data: VaultData = { created: new Date().toISOString(), projects: {}, items: {}, deleted: {} };
   const add = (type: "login" | "wifi" | "card", title: string, fields: Record<string, string>) => saveItem(data, { type, title, fields });
   add("login", "Mail", { url: "https://mail.example", username: "dana", password: "shared-Pass-2024!" });
   add("login", "Shop", { url: "https://shop.example", username: "dana", password: "shared-Pass-2024!" });

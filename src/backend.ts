@@ -5,6 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { breachReport } from "./breach.ts";
+import { ensureIdentity, makeShare, openShare, type SharePayload, shareKeyOf } from "./share.ts";
+import * as sync from "./sync.ts";
 import { browserStatus, bundledHost, disableBrowser, enableBrowser } from "./browser-setup.ts";
 import { canonicalCode, randomPassword, recoveryCode, wipe } from "./crypto.ts";
 import { healthReport } from "./health.ts";
@@ -22,6 +24,29 @@ const IDLE_MS = 15 * 60 * 1000;
 let session: store.Session | null = null;
 let idle: NodeJS.Timeout | undefined;
 let lastImport: string | null = null; // path of the CSV just imported — the only file importCleanup may delete
+let pendingShare: SharePayload | null = null; // a .kvshare opened by receiveOpen, waiting for receiveAccept
+let revision = 0; // bumped when a sync changed the vault — the window reloads
+let seen = ""; // the sync folder's and the vault's modification times at the last sync
+
+// Every save also syncs, when a folder is configured
+sync.enableAutoSync();
+
+async function syncInBackground(): Promise<void> {
+  if (!session || !sync.syncFolder()) return;
+  const before = JSON.stringify(session.data.items).length + JSON.stringify(session.data.projects).length;
+  try {
+    await sync.syncNow(session.key, session.data);
+    seen = sync.fingerprint();
+    if (JSON.stringify(session.data.items).length + JSON.stringify(session.data.projects).length !== before) revision++;
+  } catch {
+    // kept in syncStatus().error for the window
+  }
+}
+
+// While unlocked: look for changes from other computers (the folder) or other processes (the CLI, the browser) every minute
+setInterval(() => {
+  if (session && sync.syncFolder() && sync.fingerprint() !== seen) void syncInBackground();
+}, 60_000).unref();
 
 function lock(): void {
   if (session) wipe(session.key);
@@ -73,6 +98,7 @@ const methods = {
     if (password) {
       session = await store.unlockWithPassword(String(password));
       if (rememberMe) await remember.remember(session.key, store.salt());
+      void syncInBackground();
       return { ok: true as const };
     }
     const cached = await remember.recall(store.salt());
@@ -83,6 +109,7 @@ const methods = {
       await remember.forget();
       throw new Error(t("remember.stale"));
     }
+    void syncInBackground();
     return { ok: true as const };
   },
 
@@ -202,6 +229,77 @@ const methods = {
   },
 
   browserDisable: () => disableBrowser(),
+
+  // ── Sync ──
+  syncStatus: () => ({ ...sync.syncStatus(session?.data), revision }),
+
+  async syncLink({ folder, password }) {
+    const s = need();
+    const res = await sync.link(String(folder || ""), s.key, s.data, password ? String(password) : undefined);
+    if (res.key) {
+      // Joined another computer's vault: its key from now on (and remembered again, if this computer remembers)
+      const wasRemembered = remember.remembered();
+      await wipe(s.key);
+      s.key = res.key;
+      if (wasRemembered) await remember.remember(s.key, store.salt());
+    }
+    seen = sync.fingerprint();
+    revision++;
+    return { mode: res.mode };
+  },
+
+  async syncNow() {
+    const s = need();
+    const res = await sync.syncNow(s.key, s.data);
+    seen = sync.fingerprint();
+    revision++;
+    return res;
+  },
+
+  syncUnlink() {
+    sync.unlink();
+    return { ok: true as const };
+  },
+
+  // ── Sharing ──
+  async shareKey() {
+    const { key, data } = need();
+    if ((await ensureIdentity(data)).created) await store.save(key, data);
+    return { key: await shareKeyOf(data.identity!.publicKey) };
+  },
+
+  async shareItem({ id, to, path: file }) {
+    const it = store.getItem(need().data, String(id));
+    const text = await makeShare(String(to || ""), [{ type: it.type, title: it.title, fields: it.fields }]);
+    try {
+      fs.writeFileSync(String(file || ""), text, { flag: "wx", mode: 0o600 });
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error(t("export.exists", { path: String(file) }));
+      throw e;
+    }
+    return { ok: true as const };
+  },
+
+  async receiveOpen({ path: file }) {
+    const { key, data } = need();
+    if ((await ensureIdentity(data)).created) await store.save(key, data);
+    pendingShare = await openShare(fs.readFileSync(String(file || ""), "utf8"), data.identity);
+    return {
+      items: pendingShare.items.map((i) => ({ type: i.type, title: i.title })),
+      dev: pendingShare.dev.map((d) => `${d.project}/${d.key}`),
+      at: pendingShare.at,
+    };
+  },
+
+  async receiveAccept() {
+    const { key, data } = need();
+    if (!pendingShare) throw new Error(t("import.noFile"));
+    const { added, duplicates, invalid } = store.importItems(data, pendingShare.items);
+    const dev = store.addSharedDev(data, pendingShare.dev);
+    pendingShare = null;
+    if (added || dev.added) await store.save(key, data);
+    return { added, duplicates: duplicates + invalid, devAdded: dev.added, devSkipped: dev.skipped };
+  },
 
   generate: async ({ length, symbols }) => ({ value: await randomPassword(length, { symbols: symbols !== false }) }),
 } satisfies Handlers;

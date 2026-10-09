@@ -51,7 +51,7 @@ export async function create(password: string): Promise<Session> {
   if (exists()) throw new Error(t("vault.exists", { path: VAULT }));
   const header: VaultHeader = { v: 1, kdf: await newKdfParams() };
   const key = await deriveKey(password, header.kdf);
-  const data: VaultData = { created: new Date().toISOString(), projects: {}, items: {} };
+  const data: VaultData = { created: new Date().toISOString(), projects: {}, items: {}, deleted: {} };
   writeFile(await seal(key, data, header));
   return { key, data };
 }
@@ -68,19 +68,45 @@ export async function unlockWithKey(key: Uint8Array): Promise<Session> {
   return { key, data: normalize(await open<Partial<VaultData>>(key, file)) };
 }
 
+/** Runs after every save — src/sync.ts sets it when a sync folder is configured. Never fails a save. */
+type AfterSave = (key: Uint8Array, data: VaultData) => Promise<void>;
+let afterSave: AfterSave | null = null;
+export const setAfterSave = (fn: AfterSave | null): void => {
+  afterSave = fn;
+};
+
 export async function save(key: Uint8Array, data: VaultData): Promise<void> {
+  await saveQuiet(key, data);
+  if (afterSave) await afterSave(key, data).catch(() => {});
+}
+
+/** Save without the after-save hook (sync's own write) */
+export async function saveQuiet(key: Uint8Array, data: VaultData): Promise<void> {
   const file = readFile();
   writeFile(await seal(key, data, headerOf(file)));
 }
 
+/** Replace the vault's header and key — joining a synced vault that has its own master password and salt */
+export async function saveAs(header: VaultHeader, key: Uint8Array, data: VaultData): Promise<void> {
+  writeFile(await seal(key, data, header));
+}
+
+export const header = (): VaultHeader => headerOf(readFile());
+
 export const salt = (): string => readFile().kdf.salt;
 
 // Vaults created before typed items have no `items`. Additive only — the file is unchanged until the next save.
-function normalize(data: Partial<VaultData>): VaultData {
+export function normalize(data: Partial<VaultData>): VaultData {
   data.projects ??= {};
   data.items ??= {};
+  data.deleted ??= {};
   return data as VaultData;
 }
+
+/** Remember a deletion for sync (src/sync.ts) */
+const tombstone = (data: VaultData, ref: string) => {
+  data.deleted[ref] = new Date().toISOString();
+};
 
 // "project/KEY" → ["project", "KEY"]
 export function parseRef(ref: string | undefined): [string, string] {
@@ -142,6 +168,7 @@ export function deleteEntry(data: VaultData, project: string, name: string, env?
   }
   delete data.projects[project]![name];
   if (!Object.keys(data.projects[project]!).length) delete data.projects[project];
+  tombstone(data, `dev:${project}/${name}`);
 }
 
 /** project/KEY → project/KEY (also across projects) */
@@ -149,15 +176,18 @@ export function renameEntry(data: VaultData, from: [string, string], to: [string
   const e = getEntry(data, from[0], from[1]);
   if (data.projects[to[0]]?.[to[1]]) throw new Error(t("entry.exists", { ref: `${to[0]}/${to[1]}` }));
   data.projects[to[0]] ??= {};
-  data.projects[to[0]][to[1]] = e;
+  data.projects[to[0]][to[1]] = { ...e, updated: new Date().toISOString() };
   delete data.projects[from[0]]![from[1]];
   if (!Object.keys(data.projects[from[0]]!).length) delete data.projects[from[0]];
+  tombstone(data, `dev:${from[0]}/${from[1]}`);
 }
 
 export function renameProject(data: VaultData, from: string, to: string): void {
   if (!data.projects[from]) throw new Error(t("cli.noProject", { name: from }));
   if (data.projects[to]) throw new Error(t("project.exists", { name: to }));
-  data.projects[to] = data.projects[from];
+  const now = new Date().toISOString();
+  data.projects[to] = Object.fromEntries(Object.entries(data.projects[from]).map(([k, e]) => [k, { ...e, updated: now }]));
+  for (const k of Object.keys(data.projects[from])) tombstone(data, `dev:${from}/${k}`);
   delete data.projects[from];
 }
 
@@ -233,12 +263,15 @@ export function saveItem(data: VaultData, input: { id?: string; type?: string; t
 }
 
 export function setFav(data: VaultData, id: string, fav: boolean): void {
-  getItem(data, id).fav = !!fav;
+  const it = getItem(data, id);
+  it.fav = !!fav;
+  it.favAt = new Date().toISOString();
 }
 
 export function deleteItem(data: VaultData, id: string): void {
   getItem(data, id);
   delete data.items[String(id)];
+  tombstone(data, `item:${id}`);
 }
 
 // Bulk import (browser CSV, 1Password, Bitwarden, KeePass). An entry identical to an existing item is skipped:
@@ -273,6 +306,21 @@ export function importItems(data: VaultData, incoming: ImportedItem[]): { added:
     added++;
   }
   return { added, duplicates, invalid };
+}
+
+/** Add dev keys someone shared. An existing key is never overwritten — it's counted as skipped. */
+export function addSharedDev(data: VaultData, dev: { project: string; key: string; value: string; note: string }[]): { added: number; skipped: number } {
+  let added = 0;
+  let skipped = 0;
+  for (const d of dev) {
+    if (data.projects[d.project]?.[d.key]) {
+      skipped++;
+      continue;
+    }
+    setEntry(data, d.project, d.key, d.value, d.note);
+    added++;
+  }
+  return { added, skipped };
 }
 
 // ── Emergency export ──

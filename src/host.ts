@@ -20,6 +20,7 @@ import * as remember from "./remember.ts";
 import { hostOf, sameSite } from "./site.ts";
 import * as store from "./store.ts";
 import { totp } from "./totp.ts";
+import { enableAutoSync } from "./sync.ts";
 
 const IDLE_MS = 5 * 60 * 1000;
 
@@ -192,4 +193,5 @@ function main(): void {
   });
 }
 
+enableAutoSync();
 if (process.env.KV_HOST_NO_MAIN !== "1") main();

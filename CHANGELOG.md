@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.0 — 2026-10-09
+
+### Added
+
+- **Sync between computers through a folder you already sync** — Google Drive, Dropbox, OneDrive, iCloud Drive, Syncthing. "Sync…" in the app or `kv sync link <folder>`. The vault stays where it is; the folder gets an encrypted copy (`kv-vault.kv`, same format and header). Every save syncs, and the app also syncs on unlock and whenever the folder or the vault file changes (checked every minute). No server of ours, no account.
+- **Item-by-item merge** (`src/sync.ts`): the newer change wins; deletions travel (kept as tombstones for 180 days); a star travels on its own; an item changed on two computers since the last sync keeps both versions — the older one as "(conflict <date>)", with an id derived from the original, so every computer makes the same copy. Conflicted copies made by the cloud client ("kv-vault (1).kv", "… (conflicted copy).kv") are merged and removed.
+- **Joining another computer's vault**: if the folder already holds a vault with another master password, kv-vault asks for it, merges this computer's items in, and from then on uses that vault's password and key here too (remember me is renewed). The previous vault file stays as `vault.kv.bak`.
+- **A lock and a backup in the folder**: `kv-vault.lock` (stale after a minute) keeps the app, the CLI and the browser host on one computer from syncing at once; every write goes through a temp file and keeps `kv-vault.kv.bak`.
+- **Sharing with one person** (`src/share.ts`): every vault gets a sharing key (`kvpk1.…`, an X25519 public key with a checksum). "Share…" on an item, or `kv share <project/KEY> --to <key>` / `kv share --item <title> --to <key>`, seals it to someone's key (libsodium sealed box) in a `.kvshare` file you send any way you like. Only their vault opens it: "Add → Open a shared file…" or `kv receive <file>` shows what's inside by name and adds it. Received dev keys never overwrite existing ones.
+
+### Changed
+
+- Vault contents gain `deleted` (tombstones), `favAt`, this computer's `sync` state (never written to the folder) and `identity` (the sharing key pair). All additive; older vaults open unchanged.
+- Renaming a dev key or project marks the new names as changed, so the rename syncs.
+
 ## 0.9.0 — 2026-10-08
 
 ### Added

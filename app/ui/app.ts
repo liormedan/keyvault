@@ -551,6 +551,7 @@ async function openItem(id: string): Promise<void> {
             await load();
           }),
         }),
+        el("button", { type: "button", textContent: tr("share.btn"), onclick: () => void openShare(id, item.title) }),
         el("button", { type: "button", textContent: tr("edit"), onclick: () => void editItem(item.type, id) }),
         el("button", { type: "button", className: "primary", textContent: tr("close"), onclick: () => dlg().close() }),
       ),
@@ -676,6 +677,15 @@ function pickType(): void {
     el("button", {
       type: "button",
       className: "wide-btn",
+      textContent: tr("pick.receive"),
+      onclick: () => {
+        pick.close();
+        void openReceive();
+      },
+    }),
+    el("button", {
+      type: "button",
+      className: "wide-btn",
       textContent: tr("pick.import"),
       onclick: () => {
         pick.close();
@@ -774,6 +784,266 @@ function importDone(res: ImportResult): void {
   );
   cat = "all";
   render();
+}
+
+// ── Sync ──
+// The backend does the work; this dialog picks the folder and shows the state.
+
+let syncRevision = -1;
+
+async function openSync(): Promise<void> {
+  const errEl = el("p", { className: "err", role: "alert" });
+  const render = (st: Result<"syncStatus">, note = "") => {
+    const lines: HTMLElement[] = [
+      el(
+        "p",
+        { className: "browser-state" },
+        el("span", {
+          className: `chip${st.folder ? " on" : ""}`,
+          id: "syncState",
+          textContent: st.folder ? tr("sync.on", { folder: st.folder }) : tr("sync.off"),
+        }),
+      ),
+    ];
+    if (st.folder)
+      lines.push(
+        el("p", { className: "muted", textContent: st.lastSync ? tr("sync.last", { when: new Date(st.lastSync).toLocaleString() }) : tr("sync.never") }),
+      );
+    if (st.error) lines.push(el("p", { className: "err", textContent: tr("sync.error", { error: st.error }) }));
+    if (note) lines.push(el("p", { id: "syncNote", textContent: note }));
+    const choose = el("button", {
+      type: "button",
+      className: st.folder ? "" : "primary",
+      textContent: tr("sync.choose"),
+      onclick: async () => {
+        errEl.textContent = "";
+        const folder = await window.__TAURI__.dialog.open({ directory: true, multiple: false });
+        if (typeof folder === "string") await linkTo(folder);
+      },
+    });
+    const actions: HTMLElement[] = [choose];
+    if (st.folder) {
+      actions.push(
+        el("button", {
+          type: "button",
+          textContent: tr("sync.stop"),
+          onclick: safe(async () => {
+            await kv("syncUnlink");
+            render(await kv("syncStatus"));
+          }),
+        }),
+        el("button", {
+          type: "button",
+          className: "primary",
+          textContent: tr("sync.now"),
+          onclick: async () => {
+            errEl.textContent = "";
+            try {
+              await kv("syncNow");
+              await load();
+              render(await kv("syncStatus"), tr("sync.done"));
+            } catch (e) {
+              errEl.textContent = message(e);
+            }
+          },
+        }),
+      );
+    }
+    dlg().replaceChildren(
+      el(
+        "div",
+        { className: "fields-wrap" },
+        el("h2", { textContent: tr("sync.title") }),
+        el("p", { className: "muted", textContent: tr("sync.lead") }),
+        ...lines,
+        el("p", { className: "muted", textContent: tr("sync.how") }),
+        errEl,
+        el("div", { className: "actions" }, ...actions, el("button", { type: "button", textContent: tr("close"), onclick: () => dlg().close() })),
+      ),
+    );
+  };
+  // The folder already holds another computer's vault: ask for its master password
+  const askOther = (folder: string) => {
+    const pw = el("input", { type: "password", autocomplete: "off", dir: "ltr" });
+    const err2 = el("p", { className: "err", role: "alert" });
+    const form = el(
+      "form",
+      { method: "dialog" },
+      el("h2", { textContent: tr("sync.title") }),
+      el("p", { textContent: tr("sync.otherLead") }),
+      el("label", {}, tr("sync.otherPassword"), pw),
+      err2,
+      el(
+        "div",
+        { className: "actions" },
+        el("button", { type: "button", textContent: tr("cancel"), onclick: () => void openSync() }),
+        el("button", { type: "submit", className: "primary", textContent: tr("sync.join") }),
+      ),
+    );
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await kv("syncLink", { folder, password: pw.value });
+        pw.value = "";
+        await load();
+        render(await kv("syncStatus"), tr("sync.joined"));
+      } catch (e) {
+        err2.textContent = message(e);
+      }
+    });
+    dlg().replaceChildren(form);
+    pw.focus();
+  };
+  const linkTo = async (folder: string) => {
+    try {
+      const { mode } = await kv("syncLink", { folder });
+      await load();
+      render(await kv("syncStatus"), tr(mode === "created" ? "sync.created" : "sync.merged"));
+    } catch (e) {
+      if (message(e) === "sync.needPassword") askOther(folder);
+      else errEl.textContent = message(e);
+    }
+  };
+  try {
+    render(await kv("syncStatus"));
+  } catch (e) {
+    toast(message(e));
+    return;
+  }
+  if (!dlg().open) dlg().showModal();
+}
+
+// The backend syncs on its own (after saves, and when the folder changes); reload the list when it did
+setInterval(async () => {
+  if ($("#main").hidden) return;
+  try {
+    const { revision } = await invoke<Result<"syncStatus">>("kv", { method: "syncStatus" });
+    if (syncRevision >= 0 && revision !== syncRevision && !dlg().open) await load();
+    syncRevision = revision;
+  } catch {}
+}, 20_000);
+
+// ── Sharing ──
+
+async function myKeyBox(): Promise<HTMLElement> {
+  const { key } = await kv("shareKey");
+  const code = el("code", { dir: "ltr", className: "path-box", id: "myShareKey", textContent: key });
+  return el(
+    "div",
+    { className: "fields-wrap" },
+    el("p", { className: "muted", textContent: tr("share.mine") }),
+    el(
+      "div",
+      { className: "field-row" },
+      code,
+      el("button", {
+        type: "button",
+        textContent: tr("share.copyKey"),
+        onclick: () =>
+          navigator.clipboard.writeText(key).then(
+            () => toast(tr("share.copiedKey")),
+            () => window.getSelection()?.selectAllChildren(code),
+          ),
+      }),
+    ),
+  );
+}
+
+async function openShare(id: string, title: string): Promise<void> {
+  const to = el("textarea", { rows: 2, dir: "ltr", spellcheck: false, placeholder: "kvpk1.…" });
+  const errEl = el("p", { className: "err", role: "alert" });
+  const save = el("button", {
+    type: "button",
+    className: "primary",
+    textContent: tr("share.save"),
+    onclick: async () => {
+      errEl.textContent = "";
+      const file = await window.__TAURI__.dialog.save({
+        defaultPath: `${title.replace(/[\\/:*?"<>|]+/g, "-")}.kvshare`,
+        filters: [{ name: "kv-vault share", extensions: ["kvshare"] }],
+      });
+      if (typeof file !== "string") return;
+      try {
+        await kv("shareItem", { id, to: to.value, path: file });
+        dlg().replaceChildren(
+          el(
+            "div",
+            { className: "fields-wrap" },
+            el("h2", { textContent: tr("share.title", { title }) }),
+            el("p", { id: "shareDone", textContent: tr("share.done") }),
+            el("p", {}, el("code", { dir: "ltr", textContent: file })),
+            el("div", { className: "actions" }, el("button", { type: "button", className: "primary", textContent: tr("close"), onclick: () => dlg().close() })),
+          ),
+        );
+      } catch (e) {
+        errEl.textContent = message(e);
+      }
+    },
+  });
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("share.title", { title }) }),
+      el("p", { className: "muted", textContent: tr("share.lead") }),
+      el("label", {}, tr("share.to"), to),
+      errEl,
+      el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("cancel"), onclick: () => void openItem(id) }), save),
+    ),
+  );
+  to.focus();
+}
+
+async function openReceive(): Promise<void> {
+  const errEl = el("p", { className: "err", role: "alert" });
+  const preview = el("div", { className: "fields-wrap" });
+  const add = el("button", { type: "button", className: "primary", textContent: tr("receive.add"), hidden: true });
+  const choose = el("button", {
+    type: "button",
+    textContent: tr("receive.choose"),
+    className: "primary",
+    onclick: async () => {
+      errEl.textContent = "";
+      const file = await window.__TAURI__.dialog.open({ multiple: false, directory: false, filters: [{ name: "kv-vault share", extensions: ["kvshare"] }] });
+      if (typeof file !== "string") return;
+      try {
+        const got = await kv("receiveOpen", { path: file });
+        preview.replaceChildren(
+          el("p", { textContent: tr("receive.preview") }),
+          el(
+            "ul",
+            { className: "steps", id: "receivePreview" },
+            ...got.items.map((i) => el("li", {}, el("strong", { textContent: i.title }), ` — ${L(TYPES[i.type]?.label)}`)),
+          ),
+          ...(got.dev.length ? [el("p", { className: "muted", textContent: tr("receive.devKeys", { names: got.dev.join(", ") }) })] : []),
+          el("p", { className: "muted", textContent: tr("receive.warn") }),
+        );
+        add.hidden = false;
+        choose.className = "";
+      } catch (e) {
+        errEl.textContent = message(e);
+      }
+    },
+  });
+  add.onclick = safe(async () => {
+    const r = await kv("receiveAccept");
+    await load();
+    dlg().close();
+    toast(tr("receive.done", { n: r.added, d: r.devAdded }));
+  });
+  dlg().replaceChildren(
+    el(
+      "div",
+      { className: "fields-wrap" },
+      el("h2", { textContent: tr("receive.title") }),
+      el("p", { className: "muted", textContent: tr("receive.lead") }),
+      await myKeyBox(),
+      preview,
+      errEl,
+      el("div", { className: "actions" }, el("button", { type: "button", textContent: tr("cancel"), onclick: () => dlg().close() }), choose, add),
+    ),
+  );
+  if (!dlg().open) dlg().showModal();
 }
 
 // ── Browser extension ──
@@ -1029,6 +1299,7 @@ $("#lock").onclick = async () => {
 void window.__TAURI__.event.listen("kv-locked", () => void lockedView());
 $("#exportBtn").onclick = () => openExport();
 $("#browserBtn").onclick = () => void openBrowser();
+$("#syncBtn").onclick = () => void openSync();
 $("#forget").onclick = safe(async () => {
   await kv("forget");
   $("#forget").hidden = true;

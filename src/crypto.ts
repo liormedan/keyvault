@@ -73,6 +73,34 @@ export async function wipe(buf: Uint8Array | null | undefined): Promise<void> {
   if (buf) s.memzero(buf);
 }
 
+// ── Sharing (src/share.ts): libsodium sealed boxes ──
+// A vault's identity is an X25519 key pair (crypto_box). Anyone with the public key can seal a message only the
+// holder of the secret key can open (crypto_box_seal: an ephemeral key, so the sender stays anonymous).
+
+export async function newIdentity(): Promise<{ publicKey: string; secretKey: string }> {
+  const s = await ready();
+  const kp = s.crypto_box_keypair();
+  const b64 = (u: Uint8Array) => s.to_base64(u, s.base64_variants.ORIGINAL);
+  return { publicKey: b64(kp.publicKey), secretKey: b64(kp.privateKey) };
+}
+
+export async function sealTo(publicKey: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
+  const s = await ready();
+  return s.crypto_box_seal(message, publicKey);
+}
+
+export async function openSealed(identity: { publicKey: string; secretKey: string }, sealed: Uint8Array): Promise<Uint8Array> {
+  const s = await ready();
+  const d = (b: string) => s.from_base64(b, s.base64_variants.ORIGINAL);
+  return s.crypto_box_seal_open(sealed, d(identity.publicKey), d(identity.secretKey));
+}
+
+/** BLAKE2b (crypto_generichash) — a short checksum or fingerprint of a public key */
+export async function shortHash(data: Uint8Array, bytes: number): Promise<Uint8Array> {
+  const s = await ready();
+  return s.crypto_generichash(Math.max(16, bytes), data, null).subarray(0, bytes);
+}
+
 // Recovery code for an emergency export: 32 characters (about 158 bits) from libsodium randomness, in groups of four.
 // The alphabet has no 0/O or 1/I/L, so a printed code reads back unambiguously.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 symbols

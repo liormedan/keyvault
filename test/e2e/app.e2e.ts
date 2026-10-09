@@ -326,6 +326,53 @@ await shot(page, "14-browser");
 log("browser extension: off by default");
 await dlg.getByRole("button", { name: "סגירה" }).click();
 
+// ── Sync through a folder (the folder picker is replaced with a temporary folder) ──
+const cloud = fs.mkdtempSync(path.join(os.tmpdir(), "kv-e2e-cloud-"));
+const sharePath = path.join(HOME, "github.kvshare");
+await page.evaluate(
+  ({ folder, file }) => {
+    window.__TAURI__.dialog.open = async (o: { directory?: boolean }) => (o.directory ? folder : file);
+    window.__TAURI__.dialog.save = async () => file;
+  },
+  { folder: cloud, file: sharePath },
+);
+await page.click("#syncBtn");
+await page.waitForSelector("#syncState");
+if ((await page.textContent("#syncState")) !== "כבוי") throw new Error("sync should start off");
+await dlg.getByRole("button", { name: "בחירת תיקייה…" }).click();
+await page.waitForFunction(() => document.querySelector("#syncState")?.textContent?.startsWith("פעיל"), null, { timeout: 20000 });
+const syncedFile = path.join(cloud, "kv-vault.kv");
+if (!fs.existsSync(syncedFile) || fs.readFileSync(syncedFile, "utf8").includes(genPw)) throw new Error("the folder should hold an encrypted copy");
+await shot(page, "15-sync");
+log("sync: folder linked, encrypted copy written");
+await dlg.getByRole("button", { name: "הפסקת סנכרון" }).click();
+await page.waitForFunction(() => document.querySelector("#syncState")?.textContent === "כבוי");
+await dlg.getByRole("button", { name: "סגירה" }).click();
+
+// ── Share an item, then open the share file (sealed to this vault's own key) ──
+await page.click("#add");
+await page.locator("#pickGrid button", { hasText: "פתיחת קובץ משותף" }).click();
+await page.waitForSelector("#myShareKey");
+const myKey = ((await page.textContent("#myShareKey")) ?? "").trim();
+if (!/^kvpk1\.[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{4}$/.test(myKey)) throw new Error("sharing key: " + myKey);
+await dlg.getByRole("button", { name: "ביטול" }).click();
+await page.locator(".item", { hasText: "GitHub" }).locator(".open").click();
+await dlg.getByRole("button", { name: "שיתוף…" }).click();
+await dlg.locator("textarea").fill(myKey);
+await dlg.getByRole("button", { name: "שמירת קובץ שיתוף…" }).click();
+await page.waitForSelector("#shareDone");
+if (fs.readFileSync(sharePath, "utf8").includes(genPw)) throw new Error("the share file holds plaintext");
+await dlg.getByRole("button", { name: "סגירה" }).click();
+await page.click("#add");
+await page.locator("#pickGrid button", { hasText: "פתיחת קובץ משותף" }).click();
+await dlg.getByRole("button", { name: "בחירת קובץ" }).click();
+await page.waitForSelector("#receivePreview");
+if (!((await page.textContent("#receivePreview")) ?? "").includes("GitHub")) throw new Error("share preview");
+await shot(page, "16-receive");
+await dlg.getByRole("button", { name: "הוספה לכספת" }).click();
+await page.waitForFunction(() => !document.querySelector<HTMLDialogElement>("#itemDlg")!.open);
+log("share: sealed to a sharing key, opened, previewed by name");
+
 await page.locator(".row", { hasText: "SMTP_PASS" }).getByRole("button", { name: "מחיקה" }).click();
 await page.locator("#confirmDlg button[value=cancel]").click();
 await sleep(400);
