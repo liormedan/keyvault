@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { addedLines, findLeaks, installHook, secretsOf, uninstallHook } from "../src/guard.ts";
+import { addedLines, findLeaks, historyLines, installHook, secretsOf, tooGeneric, uninstallHook } from "../src/guard.ts";
 import type { VaultData } from "../src/model.ts";
 import { scan } from "../src/scan.ts";
 import { runCliFull } from "./helpers.ts";
@@ -143,4 +143,27 @@ test("kv guard stops a commit with a vault value (Windows: unlocks through DPAPI
   const locked = await runCliFull(fs.mkdtempSync(path.join(os.tmpdir(), "kv-guard-nohome-")), ["guard"], {}, repo);
   assert.equal(locked.code, 0, "no vault / locked: skips by default");
   assert.equal((await runCliFull(fs.mkdtempSync(path.join(os.tmpdir(), "kv-guard-nohome2-")), ["guard", "--strict"], {}, repo)).code, 1, "--strict blocks");
+});
+
+test("too generic to guard: words, runs of digits, common passwords; real secrets are kept", () => {
+  for (const v of ["coverage", "123456789", "Password1", "aaaaaaaaaa", "sunflowerz"]) assert.ok(tooGeneric(v), v);
+  for (const v of ["sk_live_51Hx9Q2eZvKYlo", "correct-Horse-7", "ghp_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5"]) assert.ok(!tooGeneric(v), v);
+});
+
+test("historyLines: a secret added and removed later is still found, with its commit", () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "kv-guard-history-"));
+  const git = (...a: string[]) => execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...a], { cwd: repo, encoding: "utf8" });
+  git("init", "-q");
+  fs.writeFileSync(path.join(repo, "config.ts"), `export const key = "${vault.projects.web!.API_KEY!.value}";\n`);
+  git("add", "config.ts");
+  git("commit", "-q", "-m", "oops");
+  const leaked = git("rev-parse", "--short", "HEAD").trim();
+  fs.writeFileSync(path.join(repo, "config.ts"), "export const key = process.env.API_KEY;\n");
+  git("commit", "-q", "-am", "fix");
+  const found = findLeaks(vault, historyLines(repo));
+  assert.deepEqual(
+    found.map((f) => [f.commit, f.file, f.line, f.name]),
+    [[leaked, "config.ts", 1, "web/API_KEY"]],
+  );
+  assert.ok(!JSON.stringify(found).includes(vault.projects.web!.API_KEY!.value), "names, never values");
 });

@@ -11,3 +11,18 @@ CLAUDE.local.md
 *.local.md
 !test/fixtures/*.kv
 test/e2e/out/
+# Secrets that must never reach the repository, whatever folder they land in
+*.kvshare
+*.1pux
+*.kv.bak
+*.kv.tmp
+kv-vault.lock
+native-host/
+*-adminsdk-*.json
+*service-account*.json
+*[Pp]asswords*.csv
+סיסמאות*.csv
+*.pem
+*.key
+id_rsa*
+id_ed25519*

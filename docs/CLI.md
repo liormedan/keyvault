@@ -71,7 +71,7 @@ Vercel target from `--env`: `prod`/`production` → production, `staging`/`previ
 
 | Command | |
 |---|---|
-| `kv guard [--all] [--strict]` | stop on vault values (8+ characters) in staged lines, or all tracked files; `--strict`: also stop when the vault is locked |
+| `kv guard [--all \| --history] [--strict]` | stop on vault values (8+ characters, not a dictionary word, a run of digits or a very common password) in staged lines, all tracked files (`--all`) or every commit ever made (`--history`, reports the commit too); `--strict`: also stop when the vault is locked |
 | `kv guard install [--force]` / `kv guard uninstall` | the pre-commit hook |
 | `kv scan [dir] [--json] [--import]` | `[{ file, kind, tracked, vars?: [{ name, filled, secret, inVault? }] }]` |
 

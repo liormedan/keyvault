@@ -60,12 +60,24 @@ fn backend_stderr() -> Stdio {
         .map_or_else(Stdio::null, Stdio::from)
 }
 
+// The Node.js runtime: the one the installer ships next to the backend (node.exe), so the app works on a machine
+// without Node — else whatever `node` is on PATH (development builds)
+fn node_binary(app: &AppHandle) -> PathBuf {
+    if let Ok(dir) = app.path().resource_dir() {
+        let bundled = dir.join(if cfg!(windows) { "node.exe" } else { "node" });
+        if bundled.exists() {
+            return plain_path(&bundled);
+        }
+    }
+    PathBuf::from("node")
+}
+
 fn spawn(app: &AppHandle) -> Result<Backend, String> {
     let script = backend_script(app);
     if !script.exists() {
         return Err(format!("backend not found: {}", script.display()));
     }
-    let mut cmd = Command::new("node");
+    let mut cmd = Command::new(node_binary(app));
     cmd.arg(plain_path(&script))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -77,7 +89,7 @@ fn spawn(app: &AppHandle) -> Result<Backend, String> {
     }
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("could not start node (is Node.js 20+ installed?): {e}"))?;
+        .map_err(|e| format!("could not start the backend's Node.js runtime: {e}"))?;
     let stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = BufReader::new(child.stdout.take().ok_or("no stdout")?);
     Ok(Backend { child, stdin, stdout, next: 0 })

@@ -37,22 +37,39 @@ A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app tha
 - **Leak guard** — `kv guard` stops a commit that contains any value from the vault; `kv scan` finds the `.env` and key files scattered on disk.
 - **Scriptable** — `--json` output, exit codes `0` ok · `1` failed · `2` wrong arguments, shell completion.
 
-## Install
+## Get kv-vault
+
+### Desktop app — Windows, for everyone
+
+1. Download **`kv-vault_x.y.z_x64-setup.exe`** from the [latest release](https://github.com/liormedan/kv-vault/releases/latest).
+2. Run it. It installs for your user only (no admin rights) and brings everything it needs — no Node.js, no other software. Windows may warn that the publisher is unknown, because the installer isn't code-signed yet: **More info → Run anyway**. To check that a download really came from this repository's build: `gh attestation verify kv-vault_x.y.z_x64-setup.exe --repo liormedan/kv-vault`.
+3. Choose a master password. It can't be recovered — the app's **Emergency export…** is the way back if you forget it, so make one.
+4. **Add → Import from a browser or password manager** brings in what you have: Chrome / Edge / Firefox / Safari exports, 1Password, Bitwarden, KeePass, LastPass.
+
+Then, at the bottom of the window: **Browser extension…** to fill logins on websites, **Sync…** to share the vault between your computers through Drive / Dropbox / OneDrive, **Emergency export…** for a printed recovery code.
+
+### Command line — for developers
+
+Node.js 22.6+ on Windows, macOS or Linux:
 
 ```bash
-npm install -g kv-vault     # Node.js 22.6+ · Windows, macOS, Linux
+npm install -g https://github.com/liormedan/kv-vault/releases/latest/download/kv-vault.tgz
 kv init
 ```
 
-Shell completion: `source <(kv completion bash)` (also `zsh`, `fish`, `powershell` — see `kv completion`).
+(Each release also has the versioned `kv-vault-x.y.z.tgz`. Once the package is on the npm registry this becomes `npm install -g kv-vault`.)
 
-**Desktop app (Windows):** the installer is attached to each [release](https://github.com/liormedan/kv-vault/releases/latest) (`kv-vault_x.y.z_x64-setup.exe`). It installs for the current user only and needs Node.js 22.6+.
+Shell completion: `source <(kv completion bash)` (also `zsh`, `fish`, `powershell`). On Linux, `kv copy` needs `wl-clipboard` (Wayland) or `xclip` (X11).
 
-Every release is built and published by GitHub Actions: the npm package carries [provenance](https://docs.npmjs.com/generating-provenance-statements) and the installer a build attestation, both linking back to the workflow run.
+Every release is built and published by GitHub Actions, and both the installer and the package carry a build attestation linking back to the workflow run.
 
-**From source:**
+### Your secrets stay out of git
 
-Requirements: [Node.js](https://nodejs.org/) 22.6 or newer; Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for the desktop app. On Linux, `kv copy` needs `wl-clipboard` (Wayland) or `xclip` (X11).
+kv-vault is built so that keys never have to live in a repository: `kv run` injects them at run time, `.kv.json` holds names only, and `kv guard install` adds a pre-commit hook that stops any commit containing a value from your vault (it reports the key's name, never the value). `kv guard --history` checks every commit ever made — a secret removed later is still in the history. `kv doctor` warns if the vault or the sync folder sits inside a repository, and sync refuses such a folder.
+
+### From source
+
+Requirements: [Node.js](https://nodejs.org/) 22.6+; Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for the desktop app.
 
 ```bash
 git clone https://github.com/liormedan/kv-vault.git
@@ -62,7 +79,7 @@ npm link                 # installs the `kv` command
 npm run app:installer    # builds the desktop installer (needs Rust + the Tauri prerequisites)
 ```
 
-The installer is written to `app/src-tauri/target/release/bundle/nsis/`. It installs for the current user only (no admin rights) and adds Start menu and desktop shortcuts.
+The installer is written to `app/src-tauri/target/release/bundle/nsis/`. `npm run app:installer` copies the Node.js runtime it runs on into the app (`scripts/bundle-node.mjs`), so the installed app doesn't depend on a Node installation.
 
 ## In a project
 

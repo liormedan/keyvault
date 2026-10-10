@@ -1,6 +1,7 @@
 # Push a tag vX.Y.Z → build and test on clean runners, then:
 #   · npm: publish kv-vault with provenance (a signed link from the package to this workflow run)
-#   · GitHub Release: the Windows installer + its SHA-256, with a build attestation
+#   · GitHub Release: the Windows installer (with its own Node.js runtime) and the CLI package (.tgz),
+#     their SHA-256s, and build attestations for both
 name: Release
 
 on:
@@ -49,29 +50,38 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: app/src-tauri
       - run: npm ci
       - run: npm run app:installer
-      - name: Installer path and checksum
+      # The CLI as an npm package on the release page: `npm i -g <its URL>` works before (and without) the npm registry
+      - run: npm pack
+      - name: Paths and checksums
         id: installer
         shell: bash
         run: |
           f=$(ls app/src-tauri/target/release/bundle/nsis/*_x64-setup.exe)
+          p=$(ls kv-vault-*.tgz)
+          cp "$p" kv-vault.tgz # a fixed name, so releases/latest/download/kv-vault.tgz always points at the newest
           echo "file=$f" >> "$GITHUB_OUTPUT"
+          echo "pkg=$p" >> "$GITHUB_OUTPUT"
           echo "sha=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "pkgsha=$(sha256sum "$p" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v4
         with:
-          subject-path: ${{ steps.installer.outputs.file }}
+          subject-path: |
+            ${{ steps.installer.outputs.file }}
+            ${{ steps.installer.outputs.pkg }}
       - name: Release notes from CHANGELOG.md
         shell: bash
         run: |
           v="${GITHUB_REF_NAME#v}"
           awk -v v="$v" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
-          printf '\n### Install\n\n- **CLI:** `npm i -g kv-vault` (Node.js 22.6+), then `kv help`\n- **Desktop (Windows):** download the installer below. Installs for the current user only.\n\nSHA-256 of the installer: `%s` — and a [build attestation](https://github.com/%s/attestations) shows it was built by this repository'"'"'s release workflow.\n' "${{ steps.installer.outputs.sha }}" "$GITHUB_REPOSITORY" >> notes.md
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/${{ steps.installer.outputs.pkg }}"
+          printf '\n### Install\n\n- **Desktop app (Windows):** download `%s` below and run it. Nothing else to install — it brings its own Node.js runtime. Installs for your user only; Windows may say the publisher is unknown (the installer is not code-signed yet): *More info → Run anyway*.\n- **Command line (Node.js 22.6+):** `npm install -g %s`, then `kv help`.\n\nSHA-256 — installer: `%s` · package: `%s`. [Build attestations](https://github.com/%s/attestations) show both were built by this repository'"'"'s release workflow (`gh attestation verify <file> --repo %s`).\n' "$(basename "${{ steps.installer.outputs.file }}")" "$url" "${{ steps.installer.outputs.sha }}" "${{ steps.installer.outputs.pkgsha }}" "$GITHUB_REPOSITORY" "$GITHUB_REPOSITORY" >> notes.md
       - name: Create the release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "kv-vault ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag "${{ steps.installer.outputs.file }}"
+        run: gh release create "$GITHUB_REF_NAME" --title "kv-vault ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag "${{ steps.installer.outputs.file }}" "${{ steps.installer.outputs.pkg }}" kv-vault.tgz

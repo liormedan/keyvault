@@ -33,7 +33,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/remember.ts` | "remember me" per platform: DPAPI on Windows (`dpapi.ts`), Keychain / Secret Service elsewhere (`@napi-rs/keyring`, optional native dependency — external to the bundles) |
 | `src/project.ts` | `.kv.json` — find the project from the cwd upwards, suggest a name, write the file (names only) |
 | `src/platforms.ts` | `kv push/pull/diff` through `vercel` / `gh`. Values only on stdin; every argument validated (`SAFE_ARG`) because Windows runs the .cmd shims through a shell. `Runner` is injectable for tests |
-| `src/guard.ts` | `kv guard`: vault values (≥ 8 chars) vs. the lines a commit adds (`git diff --cached -U0`) or every tracked file; the pre-commit hook. Reports names, never values |
+| `src/guard.ts` | `kv guard`: vault values (≥ 8 chars, not `tooGeneric`) vs. the lines a commit adds (`git diff --cached -U0`), every tracked file, or the whole history (`git log --all -p`); the pre-commit hook. Reports names, never values |
 | `src/scan.ts` | `kv scan`: `.env` and key files on disk, matched to the vault by hash; tracked-by-git check |
 | `src/completion.ts` | `kv completion <shell>` scripts — commands and flags only, never vault contents |
 | `src/dpapi.ts` | "remember me": the derived key encrypted with Windows DPAPI via PowerShell (stdin, not argv) |
@@ -42,6 +42,7 @@ Read [README.md](README.md) first. Private, machine-specific notes go in `CLAUDE
 | `src/ui-server.ts` + `src/ui.html` | browser UI for `kv ui`: 127.0.0.1, random port and token, Host/Origin checks |
 | `app/src-tauri/` | Tauri 2 shell: spawns `node backend.mjs` (bundled resource, `KV_BACKEND` override, source fallback in dev) and relays the `kv` command. No crypto |
 | `app/ui/` | the window — HTML/CSS + TypeScript bundled to `app/ui/dist/` (`head` = theme + language before first paint, `app`). `app.ts` calls the backend through `kv<M>()` typed by `src/protocol.ts`; `globals.d.ts` types Tauri and `window.I18N`. CSP without inline script |
+| `scripts/bundle-node.mjs` | copies the running Node binary to `app/src-tauri/resources/node.exe` before every desktop build, so the installed app doesn't need Node; the shell prefers it over PATH |
 | `scripts/build.mjs` | the only build: esbuild for the CLI, backend and window |
 | `app/src-tauri/tauri.e2e.conf.json` | merged over tauri.conf.json by `npm run app:build:e2e`: the window opens WebView2's DevTools port for the CI window test. **Never for releases.** Tauri rejects unknown keys (no `$comment`) |
 | `test/e2e/app.e2e.ts` | the real window: starts the built exe with a temporary `KV_HOME` and its own `WEBVIEW2_USER_DATA_FOLDER`, drives WebView2 over CDP (playwright-core). `npm run test:e2e` after `npm run app:build:e2e`; runs in CI (the `e2e` job). `KV_BACKEND_LOG` collects the backend's stderr when the first screen never shows |

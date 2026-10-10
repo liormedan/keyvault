@@ -17,10 +17,10 @@ import { healthReport } from "./health.ts";
 import { readImportFile } from "./import-file.ts";
 import type { ListedItem, Weakness } from "./model.ts";
 import { diff as diffValues, type Diff, githubSecretNames, type Platform, PLATFORMS, pullVercel, push, vercelTarget } from "./platforms.ts";
-import { findLeaks, hookInstalled, installHook, stagedLines, trackedLines, uninstallHook } from "./guard.ts";
+import { findLeaks, historyLines, hookInstalled, installHook, stagedLines, trackedLines, uninstallHook } from "./guard.ts";
 import { findProject, suggestName, writeProject } from "./project.ts";
 import { scan } from "./scan.ts";
-import { copyWithClear, readHidden, readStdin } from "./io.ts";
+import { copyWithClear, readHidden, readStdin, winQuote } from "./io.ts";
 import * as store from "./store.ts";
 
 // Every save also syncs, when a sync folder is configured
@@ -210,7 +210,7 @@ const commands: Record<string, () => Promise<void>> = {
     const env: NodeJS.ProcessEnv = { ...process.env, ...store.projectValues(data, project, environment) };
     // On Windows a shell is needed to run pnpm.cmd / vercel.cmd, so pass one string, quoting arguments that contain spaces
     const win = process.platform === "win32";
-    const q = (a: string) => (/[\s"&|<>^()]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+    const q = winQuote;
     const child = win
       ? spawn(command.map(q).join(" "), { stdio: "inherit", env, shell: true })
       : spawn(command[0]!, command.slice(1), { stdio: "inherit", env });
@@ -608,6 +608,7 @@ const commands: Record<string, () => Promise<void>> = {
     }
     if (sub && !sub.startsWith("--")) throw new UsageError(t("cli.usage.guard"));
     const all = has("--all");
+    const history = has("--history");
     const strict = has("--strict");
     // a git hook has no terminal: only a remembered key can unlock — otherwise skip (or block with --strict)
     const session = await unlockQuietly();
@@ -616,15 +617,16 @@ const commands: Record<string, () => Promise<void>> = {
       err(t("guard.locked"));
       return;
     }
-    const lines = all ? trackedLines() : stagedLines();
+    const lines = history ? historyLines() : all ? trackedLines() : stagedLines();
     const found = findLeaks(session.data, lines);
+    const what = t(history ? "guard.history" : all ? "guard.tracked" : "guard.staged");
     if (!found.length) {
-      err(t("guard.clean", { what: t(all ? "guard.tracked" : "guard.staged"), n: lines.length }));
+      err(t("guard.clean", { what, n: lines.length }));
       return;
     }
-    err(t(all ? "guard.foundAll" : "guard.found", { n: found.length }));
-    for (const f of found) err(t("guard.foundLine", { file: f.file, line: f.line, name: f.name }));
-    err(t("guard.hint"));
+    err(t(history ? "guard.foundHistory" : all ? "guard.foundAll" : "guard.found", { n: found.length }));
+    for (const f of found) err(t("guard.foundLine", { file: f.commit ? `${f.commit} ${f.file}` : f.file, line: f.line, name: f.name }));
+    err(t(history ? "guard.hintHistory" : "guard.hint"));
     process.exitCode = 1;
   },
 
@@ -675,6 +677,19 @@ const commands: Record<string, () => Promise<void>> = {
     );
     if (!store.exists()) return void warn(t("doctor.noVault"));
     ok(t("doctor.vault", { path: store.VAULT }));
+    // A vault or sync folder inside a git work tree is one `git add .` away from GitHub — even a home folder
+    // that is a repository by accident (an empty `git init` in the user folder)
+    const repoOf = (dir: string): string | null => {
+      for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+        if (fs.existsSync(path.join(d, ".git"))) return d;
+        if (path.dirname(d) === d) return null;
+      }
+    };
+    const vaultRepo = repoOf(store.HOME);
+    if (vaultRepo) warn(t("doctor.vaultInRepo", { path: vaultRepo }));
+    const syncDir = sync.syncFolder();
+    const syncRepo = syncDir ? repoOf(syncDir) : null;
+    if (syncRepo && syncRepo !== vaultRepo) warn(t("doctor.syncInRepo", { path: syncRepo }));
     if (process.platform !== "win32") {
       const mode = fs.statSync(store.VAULT).mode & 0o777;
       if (mode & 0o077) warn(t("doctor.perms", { mode: mode.toString(8), path: store.VAULT }));

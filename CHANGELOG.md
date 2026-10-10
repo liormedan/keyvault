@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.1 — 2026-10-10
+
+Ready for people who download it from GitHub, and stricter about keeping secrets out of git.
+
+### Added
+
+- **The desktop app brings its own Node.js runtime** (`scripts/bundle-node.mjs` → `node.exe` next to the backend). It no longer needs Node installed — a regular Windows user downloads the installer and that's it. The window test now runs the app with no Node on PATH to prove it.
+- **The CLI package on every release page** (`kv-vault-x.y.z.tgz`, and `kv-vault.tgz` for the latest link), with a build attestation: `npm install -g https://github.com/liormedan/kv-vault/releases/latest/download/kv-vault.tgz` works before the npm registry does.
+- **`kv guard --history`** — checks every line any commit ever added, on every branch and tag, and reports the commit, file, line and key name. A secret removed in a later commit is still in the history.
+- **`kv doctor`** warns when the vault or the sync folder is inside a git repository, and **sync refuses** such a folder.
+
+### Changed
+
+- **`kv guard` skips values too generic to tell apart from ordinary text** — a dictionary word, a run of digits, a very common password. They matched by coincidence (a word in `package.json`, `123456789` in a test) and would block honest commits; `kv audit` lists them as weak.
+- The README starts with two paths: the desktop app for everyone, the command line for developers. Release notes say the same.
+- `package.json` is no longer `private`, so the npm publish job can run once `NPM_TOKEN` is set.
+- `kv run` on Windows quotes arguments by the CommandLineToArgvW rules (backslashes before a quote are doubled) — CodeQL's last open code alert. The third-party `rust-cache` action is pinned to a commit.
+- `.gitignore` excludes every secret file kv-vault can produce or import: `.kvshare`, `.1pux`, password CSV exports, service-account JSON keys, private keys, vault backups and locks.
+
 ## 0.10.0 — 2026-10-09
 
 ### Added
