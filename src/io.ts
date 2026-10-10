@@ -42,6 +42,16 @@ export async function readStdin(): Promise<string> {
 
 const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
 
+/**
+ * One argument quoted for a Windows command line (`kv run` goes through cmd so .cmd shims work): wrapped in quotes
+ * when it holds a space or a shell character, with the CommandLineToArgvW rules — a quote becomes \", and backslashes
+ * right before a quote or before the closing quote are doubled so they stay literal.
+ */
+export function winQuote(a: string): string {
+  if (!/[\s"&|<>^()]/.test(a)) return a;
+  return `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+}
+
 // Windows: put text on the clipboard marked as private. Clipboard history (Win+V) and cloud clipboard
 // sync skip content that carries these formats — without them, a copied secret outlives the 20-second clear.
 // https://learn.microsoft.com/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats

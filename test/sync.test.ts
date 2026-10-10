@@ -148,3 +148,18 @@ test("joining another computer's vault: its password from now on, nothing from h
   assert.equal(store.header().kdf.salt, kdf.salt);
   sync.unlink();
 });
+
+test("a sync folder inside a project repository is refused, unless git ignores it", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "kv-sync-repo-"));
+  execFileSync("git", ["init", "-q"], { cwd: repo });
+  const inside = path.join(repo, "cloud");
+  fs.mkdirSync(inside);
+  assert.equal(sync.exposedInRepo(path.join(inside, sync.SYNC_FILE)), repo);
+  fs.writeFileSync(path.join(repo, ".gitignore"), "cloud/\n");
+  assert.equal(sync.exposedInRepo(path.join(inside, sync.SYNC_FILE)), null, "ignored: fine");
+  assert.equal(sync.exposedInRepo(path.join(os.homedir(), "kv-sync-not-a-repo", sync.SYNC_FILE)), null);
+  fs.rmSync(path.join(repo, ".gitignore"));
+  const s = await store.unlockWithPassword("password of B");
+  await assert.rejects(sync.link(inside, s.key, s.data), /inside a git repository/);
+});

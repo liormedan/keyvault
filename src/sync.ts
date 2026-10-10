@@ -10,6 +10,7 @@
 // (tombstones in `deleted`); an item changed on two computers since this one last synced keeps both versions — the
 // older one as a copy titled "(conflict <date>)", with an id derived from the original, so every computer makes the
 // same copy instead of a new one each time.
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -307,6 +308,8 @@ export async function link(folder: string, key: Uint8Array, data: VaultData, pas
     throw new SyncError(t("sync.folderGone", { folder }));
   }
   if (!st.isDirectory()) throw new SyncError(t("sync.notFolder", { folder }));
+  const repo = exposedInRepo(path.join(folder, SYNC_FILE));
+  if (repo) throw new SyncError(t("doctor.syncInRepo", { path: repo }));
   const file = syncPath(folder);
   if (!fs.existsSync(file)) {
     setSyncFolder(folder);
@@ -333,6 +336,30 @@ export async function link(folder: string, key: Uint8Array, data: VaultData, pas
   setSyncFolder(folder);
   const result = await syncNow(theirKey, data);
   return { mode: "joined", key: theirKey, result };
+}
+
+/**
+ * The git repository that would pick this file up with `git add .`, if any: the nearest work tree above it, unless
+ * the file is git-ignored there. A home folder that is itself a repository doesn't count here (everything would be
+ * "inside" it) — `kv doctor` warns about that instead. Without git installed there is nothing to check.
+ */
+export function exposedInRepo(file: string): string | null {
+  let root: string | null = null;
+  for (let d = path.dirname(path.resolve(file)); ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, ".git"))) {
+      root = d;
+      break;
+    }
+    if (path.dirname(d) === d) return null;
+  }
+  if (path.resolve(root) === path.resolve(os.homedir())) return null;
+  try {
+    execFileSync("git", ["-C", root, "check-ignore", "-q", path.relative(root, file)], { stdio: "ignore" });
+    return null; // ignored
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    return status === 1 ? root : null; // 1: not ignored · anything else: not a repository after all, or no git
+  }
 }
 
 export function unlink(): void {

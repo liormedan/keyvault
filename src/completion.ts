@@ -51,7 +51,7 @@ const FLAGS: Partial<Record<(typeof COMMANDS)[number], string[]>> = {
   check: ["--file", "--env"],
   push: ["vercel", "github", "--env", "--target", "--sensitive", "--repo", "--environment", "--dry-run"],
   pull: ["vercel", "--env", "--target"],
-  guard: ["install", "uninstall", "--all", "--strict", "--force"],
+  guard: ["install", "uninstall", "--all", "--history", "--strict", "--force"],
   scan: ["--json", "--import"],
   diff: ["vercel", "github", "--env", "--target", "--repo", "--environment", "--json"],
   ls: ["--json"],

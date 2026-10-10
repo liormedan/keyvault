@@ -46,6 +46,11 @@ async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> 
       WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
       KV_BACKEND_LOG: BACKEND_LOG,
+      // No Node.js on PATH: the app must start its backend with the node.exe it ships
+      PATH: (process.env.PATH ?? "")
+        .split(path.delimiter)
+        .filter((d) => d && !fs.existsSync(path.join(d, "node.exe")))
+        .join(path.delimiter),
       ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],

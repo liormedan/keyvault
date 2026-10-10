@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { t } from "./i18n.ts";
 import type { VaultData } from "./model.ts";
+import { weakness } from "./health.ts";
 import { readSmallFile } from "./scan.ts";
 import { TYPES } from "./types.ts";
 
@@ -15,15 +16,27 @@ export const MIN_LENGTH = 8;
 export interface Finding {
   file: string;
   line: number;
+  /** --history: the commit (short hash) that added the line */
+  commit?: string;
   /** project/KEY, project/KEY (env), or the item's title / field label */
   name: string;
 }
+
+/**
+ * Values too generic to tell apart from ordinary text: a dictionary word, a run of digits, "password1".
+ * In code they match by coincidence ("123456789" in a test, a word in package.json), so guarding them would only
+ * block honest commits. They are weak passwords anyway — `kv audit` lists them.
+ */
+export const tooGeneric = (value: string): boolean => {
+  const w = weakness(value);
+  return w === "common" || w === "digits" || w === "letters" || w === "repeated";
+};
 
 /** Every value worth guarding, with a name to report instead of the value */
 export function secretsOf(data: VaultData): { name: string; value: string }[] {
   const out: { name: string; value: string }[] = [];
   const add = (name: string, value: string | undefined) => {
-    if (value && value.length >= MIN_LENGTH) out.push({ name, value });
+    if (value && value.length >= MIN_LENGTH && !tooGeneric(value)) out.push({ name, value });
   };
   for (const [p, keys] of Object.entries(data.projects)) {
     for (const [k, e] of Object.entries(keys)) {
@@ -52,10 +65,11 @@ export function addedLines(diff: string): { file: string; line: number; text: st
   return out;
 }
 
-export function findLeaks(data: VaultData, lines: { file: string; line: number; text: string }[]): Finding[] {
+export function findLeaks(data: VaultData, lines: { file: string; line: number; text: string; commit?: string }[]): Finding[] {
   const secrets = secretsOf(data);
   const out: Finding[] = [];
-  for (const l of lines) for (const s of secrets) if (l.text.includes(s.value)) out.push({ file: l.file, line: l.line, name: s.name });
+  for (const l of lines)
+    for (const s of secrets) if (l.text.includes(s.value)) out.push({ file: l.file, line: l.line, name: s.name, ...(l.commit ? { commit: l.commit } : {}) });
   return out;
 }
 
@@ -82,6 +96,21 @@ export function trackedLines(cwd?: string) {
     if (text.includes("\0")) continue; // binary
     const lines = text.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) out.push({ file: f, line: i + 1, text: lines[i]! });
+  }
+  return out;
+}
+
+/**
+ * Every line any commit ever added, on every branch and tag (`kv guard --history`). Removing a secret in a later
+ * commit doesn't take it out of the repository — once pushed, anyone with a clone has it.
+ */
+export function historyLines(cwd?: string) {
+  const log = git(["log", "--all", "-p", "-U0", "--no-color", "--no-ext-diff", "--no-renames", "--format=%x00%h"], cwd);
+  const out: { file: string; line: number; text: string; commit: string }[] = [];
+  for (const chunk of log.split("\0").filter(Boolean)) {
+    const nl = chunk.indexOf("\n");
+    const commit = (nl < 0 ? chunk : chunk.slice(0, nl)).trim();
+    for (const l of addedLines(nl < 0 ? "" : chunk.slice(nl + 1))) out.push({ ...l, commit });
   }
   return out;
 }
