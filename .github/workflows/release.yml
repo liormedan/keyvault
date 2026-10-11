@@ -1,7 +1,9 @@
-# Push a tag vX.Y.Z → build and test on clean runners, then:
-#   · npm: publish kv-vault with provenance (a signed link from the package to this workflow run)
-#   · GitHub Release: the Windows installer (with its own Node.js runtime) and the CLI package (.tgz),
-#     their SHA-256s, and build attestations for both
+# Push a tag vX.Y.Z → build and test on clean runners, then one GitHub Release with:
+#   · the desktop app — Windows installer, Linux AppImage and .deb — each with its own Node.js runtime
+#   · latest.json and a .sig per installer: the app's automatic updates accept only files signed with the updater key
+#     (secrets TAURI_SIGNING_PRIVATE_KEY / _PASSWORD; the public half is in tauri.conf.json)
+#   · the CLI package (.tgz), an SBOM, SHA256SUMS.txt, and build attestations for every file
+#   · npm: kv-vault with provenance (a signed link from the package to this workflow run), once NPM_TOKEN is set
 name: Release
 
 on:
@@ -39,11 +41,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   desktop:
-    runs-on: windows-latest
-    permissions:
-      contents: write # create the release and upload the installer
-      id-token: write # build attestation
-      attestations: write
+    strategy:
+      matrix:
+        # ubuntu-22.04: the oldest supported glibc, so the AppImage runs on more distributions
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -53,35 +58,93 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: app/src-tauri
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
       - run: npm ci
-      - run: npm run app:installer
-      # The CLI as an npm package on the release page: `npm i -g <its URL>` works before (and without) the npm registry
-      - run: npm pack
-      - name: Paths and checksums
-        id: installer
+      - name: The updater key is set
+        shell: bash
+        run: test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set — the installers could not be signed for updates"; exit 1; }
+      - run: npm run app:installer -- --config app/src-tauri/tauri.release.conf.json
+      - name: Collect the installers and their update signatures
         shell: bash
         run: |
-          f=$(ls app/src-tauri/target/release/bundle/nsis/*_x64-setup.exe)
-          p=$(ls kv-vault-*.tgz)
-          cp "$p" kv-vault.tgz # a fixed name, so releases/latest/download/kv-vault.tgz always points at the newest
-          echo "file=$f" >> "$GITHUB_OUTPUT"
-          echo "pkg=$p" >> "$GITHUB_OUTPUT"
-          echo "sha=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "pkgsha=$(sha256sum "$p" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/attest-build-provenance@v4
+          b=app/src-tauri/target/release/bundle
+          mkdir out
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp $b/nsis/*_x64-setup.exe $b/nsis/*_x64-setup.exe.sig out/
+          else
+            cp $b/appimage/*_amd64.AppImage $b/appimage/*_amd64.AppImage.sig $b/deb/*_amd64.deb out/
+          fi
+          ls -l out
+      - name: The Linux packages carry a Node.js that runs
+        if: runner.os == 'Linux'
+        run: bash scripts/check-linux-bundle.sh out
+      - uses: actions/upload-artifact@v7
         with:
-          subject-path: |
-            ${{ steps.installer.outputs.file }}
-            ${{ steps.installer.outputs.pkg }}
-      - name: Release notes from CHANGELOG.md
-        shell: bash
+          name: desktop-${{ runner.os }}
+          path: out/
+          if-no-files-found: error
+
+  release:
+    needs: [npm, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and upload the files
+      id-token: write # build attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: out
+      # The CLI as an npm package on the release page: `npm i -g <its URL>` works before (and without) the npm registry.
+      # kv-vault.tgz: a fixed name, so releases/latest/download/kv-vault.tgz always points at the newest
+      - name: CLI package
+        run: npm pack --pack-destination out && cp out/kv-vault-*.tgz out/kv-vault.tgz
+      # Every dependency of the CLI and the desktop app (package-lock.json, Cargo.lock), SPDX
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: out/kv-vault-${{ github.ref_name }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: This version's notes, latest.json, checksums
         run: |
           v="${GITHUB_REF_NAME#v}"
-          awk -v v="$v" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
-          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/${{ steps.installer.outputs.pkg }}"
-          printf '\n### Install\n\n- **Desktop app (Windows):** download `%s` below and run it. Nothing else to install — it brings its own Node.js runtime. Installs for your user only; Windows may say the publisher is unknown (the installer is not code-signed yet): *More info → Run anyway*.\n- **Command line (Node.js 22.6+):** `npm install -g %s`, then `kv help`.\n\nSHA-256 — installer: `%s` · package: `%s`. [Build attestations](https://github.com/%s/attestations) show both were built by this repository'"'"'s release workflow (`gh attestation verify <file> --repo %s`).\n' "$(basename "${{ steps.installer.outputs.file }}")" "$url" "${{ steps.installer.outputs.sha }}" "${{ steps.installer.outputs.pkgsha }}" "$GITHUB_REPOSITORY" "$GITHUB_REPOSITORY" >> notes.md
+          awk -v v="$v" '$0 ~ "^## "v" " {f=1; next} /^## / {f=0} f' CHANGELOG.md > changes.md
+          node scripts/updater-manifest.mjs out "$GITHUB_REF_NAME" changes.md
+          (cd out && sha256sum -- * > SHA256SUMS.txt)
+          cat out/SHA256SUMS.txt
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: out/*
+      - name: Release notes
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          cp changes.md notes.md
+          cat >> notes.md <<EOF
+
+          ### Install
+
+          - **Windows:** \`kv-vault_${v}_x64-setup.exe\`. Installs for your user only, with its own Node.js runtime. Windows may say the publisher is unknown (the installer is not code-signed yet): *More info → Run anyway*.
+          - **Linux:** \`kv-vault_${v}_amd64.AppImage\` — \`chmod +x\` it and run; it updates itself. Or \`sudo apt install ./kv-vault_${v}_amd64.deb\` (Debian, Ubuntu); a newer .deb updates it.
+          - **Command line (Node.js 22.6+):** \`npm install -g $url/kv-vault-$v.tgz\`, then \`kv help\`.
+
+          **Updates:** the desktop app looks for a new version on this page and installs only files signed with the project's update key. Turn it off with *Update check* at the bottom of the window.
+
+          **Verify:** \`SHA256SUMS.txt\` lists every file. [Build attestations](https://github.com/$GITHUB_REPOSITORY/attestations) show each was built by this repository's release workflow (\`gh attestation verify <file> --repo $GITHUB_REPOSITORY\`). \`kv-vault-$GITHUB_REF_NAME.spdx.json\` lists every dependency (SBOM).
+          EOF
       - name: Create the release
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "kv-vault ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag "${{ steps.installer.outputs.file }}" "${{ steps.installer.outputs.pkg }}" kv-vault.tgz
+        run: gh release create "$GITHUB_REF_NAME" --title "kv-vault ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag out/*

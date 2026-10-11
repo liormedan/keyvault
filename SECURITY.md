@@ -14,6 +14,7 @@ In scope:
 - Values leaking into logs, error messages, process arguments, the clipboard beyond the 20-second window, or the window's DOM after a dialog closes
 - Bypassing the browser UI's protections (`kv ui`): token, Host/Origin checks, 127.0.0.1 binding
 - Changes to the vault file that are not detected on decryption
+- Getting the desktop app to install an update that the project's update key did not sign (the updater checks a minisign signature against `plugins.updater.pubkey` in `tauri.conf.json`)
 
 Out of scope (see the security model in the README): malware running as the same user while the vault is unlocked, physical access to an unlocked session, and anyone logged in as the same Windows user when "remember me" is on.
 

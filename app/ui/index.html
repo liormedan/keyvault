@@ -36,6 +36,11 @@
 
 <!-- Unlocked -->
 <div id="main" hidden>
+  <div class="update-bar" id="updateBar" role="status" hidden>
+    <span id="updateText"></span>
+    <button class="primary" id="updateInstall" type="button" data-i18n="update.install"></button>
+    <button class="link" id="updateLater" type="button" data-i18n="update.later"></button>
+  </div>
   <header>
     <h1 data-i18n="app.title"></h1>
     <input type="search" id="q" data-i18n-placeholder="main.search" data-i18n-aria="main.search">
@@ -54,6 +59,7 @@
           <button class="link" id="syncBtn" type="button" data-i18n="main.sync"></button>
           <button class="link" id="browserBtn" type="button" data-i18n="main.browser"></button>
           <button class="link" id="exportBtn" type="button" data-i18n="main.export"></button>
+          <button class="link" id="updatesBtn" type="button"></button>
           <button class="link" id="forget" hidden data-i18n="main.forget"></button>
         </span>
       </footer>

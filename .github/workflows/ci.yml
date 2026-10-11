@@ -51,12 +51,34 @@ jobs:
       - run: npm ci
       - run: npm run app:build:e2e
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-screenshots
           path: test/e2e/out/
           if-no-files-found: ignore
+
+  # The Linux desktop packages (AppImage, .deb) build, and the Node.js runtime inside them runs. Releases sign them
+  # for updates as well (tauri.release.conf.json); pull requests have no key, so this build does not.
+  linux-app:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: app/src-tauri
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+      - run: npm ci
+      - run: npm run app:installer
+      - run: |
+          b=app/src-tauri/target/release/bundle
+          mkdir out && cp $b/appimage/*_amd64.AppImage $b/deb/*_amd64.deb out/ && ls -l out
+          bash scripts/check-linux-bundle.sh out
 
   # The browser extension in a real Chromium, talking to the native host. CI only: it registers the host for the
   # runner's user (HKCU), which a local test must never do.

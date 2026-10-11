@@ -154,6 +154,15 @@ fn workstation_locked() -> bool {
     false
 }
 
+// Before an update installs: end the backend, so the installer can replace node.exe and backend.mjs.
+// The vault is already locked by then (the window locks it first); a later call would start it again.
+#[tauri::command]
+fn kv_stop(state: State<'_, AppState>) {
+    if let Ok(mut guard) = state.0.lock() {
+        *guard = None; // Drop kills the process
+    }
+}
+
 fn lock_vault(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Ok(mut guard) = state.0.lock() {
@@ -189,12 +198,14 @@ fn watch_session(app: AppHandle) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
         .setup(|app| {
             watch_session(app.handle().clone());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![kv])
+        .invoke_handler(tauri::generate_handler![kv, kv_stop])
         .run(tauri::generate_context!())
         .expect("kv-vault: failed to start the window");
 }

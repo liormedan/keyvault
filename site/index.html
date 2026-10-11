@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kv-vault — a free, local password manager</title>
+<meta name="description" content="Passwords, cards, two-factor codes and developer keys in one encrypted file on your computer. No account, no server, no telemetry. Open source (MIT).">
+<link rel="icon" href="img/icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><img src="img/icon.png" alt="" width="28" height="28"> kv-vault</a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#security">Security</a>
+    <a href="#developers">Developers</a>
+    <a href="https://github.com/liormedan/kv-vault">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Your passwords, in one encrypted file on your computer.</h1>
+    <p class="lead">kv-vault is a free, open-source password manager. No account, no server of ours, no telemetry — the vault never leaves your machine unless you put it in your own cloud folder.</p>
+    <div class="cta" id="downloads">
+      <a class="button primary" id="dl-primary" href="https://github.com/liormedan/kv-vault/releases/latest">Download</a>
+      <a class="button" id="dl-other" href="https://github.com/liormedan/kv-vault/releases/latest">All downloads</a>
+    </div>
+    <p class="small" id="dl-note">Windows 10/11 and Linux (AppImage, .deb). Free, MIT licensed.</p>
+    <img class="shot" src="img/main.png" width="920" height="700" alt="The kv-vault window: logins with a copy-password button, categories on the side, dev keys grouped by project">
+  </section>
+
+  <section id="features">
+    <h2>Everything a password manager does — on your terms</h2>
+    <div class="grid">
+      <article><h3>Fills sign-ins in your browser</h3><p>An extension for Chrome, Edge and Firefox fills the login for the site you're on and offers to save new ones. It talks to this computer only — no port, no account — and only once you turn it on.</p></article>
+      <article><h3>Imports what you already have</h3><p>Chrome, Edge, Firefox and Safari exports, 1Password, Bitwarden, KeePass and LastPass. Duplicates are skipped, and the app offers to delete the plaintext export afterwards.</p></article>
+      <article><h3>Password health</h3><p>Reused, weak and year-old passwords, and logins without two-factor, in one view. An opt-in breach check sends only 5 characters of each password's hash.</p></article>
+      <article><h3>Two-factor codes</h3><p>Paste a site's two-factor key into a login and the current 6-digit code is one click away.</p></article>
+      <article><h3>Sync without a server</h3><p>Pick a folder your cloud already syncs — Drive, Dropbox, OneDrive, iCloud. An encrypted copy lives there and changes merge item by item.</p></article>
+      <article><h3>Share with one person</h3><p>Seal an item to someone's sharing key into a <code>.kvshare</code> file. Only their vault can open it.</p></article>
+      <article><h3>A way back</h3><p>An emergency export under a recovery code you print. Forget the master password, and the code still opens your vault.</p></article>
+      <article><h3>Cards, notes, Wi-Fi, servers</h3><p>Typed items for what you keep besides logins — and in English or Hebrew, dark or light.</p></article>
+    </div>
+    <div class="pair">
+      <figure><img src="img/item.png" width="920" height="700" loading="lazy" alt="A login opened: website, username, a hidden password with Show and Copy"><figcaption>Secrets stay hidden until you ask, and copies clear after 20 seconds.</figcaption></figure>
+      <figure><img src="img/hebrew-light.png" width="920" height="700" loading="lazy" alt="The same window in Hebrew, right to left, in the light theme"><figcaption>English or Hebrew, dark or light.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="security">
+    <h2>How it keeps your secrets</h2>
+    <ul class="checks">
+      <li><strong>Well-known cryptography, nothing home-made.</strong> Argon2id turns your master password into a key; XChaCha20-Poly1305 encrypts the whole vault — names included. Both come from <a href="https://doc.libsodium.org/">libsodium</a>.</li>
+      <li><strong>One file you own.</strong> <code>~/.keyvault/vault.kv</code>. Copy it, back it up, sync it — it is useless without the password.</li>
+      <li><strong>Locks itself</strong> after 15 idle minutes and whenever Windows locks. Copied passwords stay out of clipboard history and cloud clipboard.</li>
+      <li><strong>Updates you can check.</strong> The app installs only updates signed with the project's key. Every download has a build attestation from this repository's release workflow, a checksum and an SBOM.</li>
+      <li><strong>Open source.</strong> Every line is on <a href="https://github.com/liormedan/kv-vault">GitHub</a>, tested on Windows, macOS and Linux on every change. Found a problem? <a href="https://github.com/liormedan/kv-vault/security/policy">Report it privately</a>.</li>
+    </ul>
+  </section>
+
+  <section id="developers">
+    <h2>For developers: keys without <code>.env</code> files</h2>
+    <p>The same vault has a <code>kv</code> command line (Node.js 22.6+, Windows, macOS, Linux). Run a project with its keys as environment variables, push them to Vercel or GitHub, and stop a commit that contains any of them.</p>
+<pre><code>npm install -g https://github.com/liormedan/kv-vault/releases/latest/download/kv-vault.tgz
+kv set my-app/OPENAI_API_KEY      # typed hidden, never on the command line
+kv run my-app -- npm run dev      # the app gets its keys; no .env on disk
+kv guard install                  # a pre-commit hook that blocks leaked values</code></pre>
+    <p><a href="https://github.com/liormedan/kv-vault/blob/main/docs/CLI.md">The full command reference →</a></p>
+  </section>
+
+  <section class="honest">
+    <h2>Good to know</h2>
+    <ul>
+      <li>The Windows installer is not code-signed yet, so Windows may say the publisher is unknown: <em>More info → Run anyway</em>. You can check where a file came from: <code>gh attestation verify &lt;file&gt; --repo liormedan/kv-vault</code>.</li>
+      <li>A macOS app is not available yet; the command line works on macOS.</li>
+      <li>The browser extension is installed from the app for now (it is not in the Chrome Web Store or Firefox Add-ons yet).</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="bottom">
+  <span>kv-vault · MIT license</span>
+  <a href="https://github.com/liormedan/kv-vault">Source</a>
+  <a href="https://github.com/liormedan/kv-vault/releases">Releases</a>
+  <a href="https://github.com/liormedan/kv-vault/blob/main/CHANGELOG.md">Changelog</a>
+</footer>
+<script src="download.js"></script>
+</body>
+</html>

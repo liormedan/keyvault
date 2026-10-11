@@ -82,6 +82,10 @@ export interface Methods {
   browserEnable: { params: None; result: BrowserStatus };
   browserDisable: { params: None; result: BrowserStatus };
 
+  // whether the window checks GitHub for a new version (src/updates.ts) — works while locked
+  updates: { params: None; result: { enabled: boolean } };
+  setUpdates: { params: { on: boolean }; result: { enabled: boolean } };
+
   // sync through a folder the user already syncs
   /** `revision` goes up whenever a sync changed what the window shows — the window reloads on a change */
   syncStatus: { params: None; result: SyncStatus & { revision: number } };
