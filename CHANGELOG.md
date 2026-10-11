@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.0 — 2026-10-11
+
+A download that keeps itself current, for Windows and Linux, and a page to send people to.
+
+### Added
+
+- **Automatic updates** (Tauri's updater). The app looks for `latest.json` on this repository's newest release at start and every 12 hours, shows "kv-vault x.y.z is available", and on *Install and restart* downloads the installer, locks the vault, ends the backend and installs. It accepts only an installer signed with the project's update key (minisign/Ed25519, public key in `tauri.conf.json`) — a file swapped on the release page would be refused. *Update check: on/off* at the bottom of the window; the choice lives in `config.json` (`updates`). Nothing about the vault is sent — GitHub sees an ordinary download.
+- **Linux desktop app**: an AppImage (updates itself) and a `.deb`, built on Ubuntu 22.04, each with its own Node.js runtime. CI builds both on every pull request and runs the bundled `node` from each (`scripts/check-linux-bundle.sh`).
+- **Landing page** — `site/`, published to GitHub Pages by `.github/workflows/pages.yml`: what kv-vault is, a download button for the visitor's system (from the newest release), screenshots from the window test, how it protects secrets, the command line, and what isn't done yet (code signing, macOS).
+- **Every release file is accounted for**: `SHA256SUMS.txt`, an SPDX SBOM of every npm and Rust dependency (`kv-vault-vX.Y.Z.spdx.json`), and a build attestation for each file — installers, update signatures, `latest.json`, the CLI package.
+
+### Changed
+
+- The release workflow builds Windows and Linux in parallel, then one job publishes everything; it fails if the update key is missing rather than ship installers that can't update.
+- The bundled Node.js is `node.exe` on Windows and `node` on Linux (`tauri.windows.conf.json`, `tauri.linux.conf.json`).
+- `upload-artifact` / `download-artifact` moved to their current major versions.
+
 ## 0.10.1 — 2026-10-10
 
 Ready for people who download it from GitHub, and stricter about keeping secrets out of git.

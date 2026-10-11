@@ -46,6 +46,7 @@ async function launch(extraEnv: Record<string, string> = {}): Promise<Launched> 
       WEBVIEW2_USER_DATA_FOLDER: path.join(HOME, "webview"),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}`,
       KV_BACKEND_LOG: BACKEND_LOG,
+      KV_NO_UPDATE_CHECK: "1", // no request to GitHub; the update step below stubs the updater
       // No Node.js on PATH: the app must start its backend with the node.exe it ships
       PATH: (process.env.PATH ?? "")
         .split(path.delimiter)
@@ -415,6 +416,32 @@ if ((await page.evaluate(() => document.documentElement.dir)) !== "rtl") throw n
 await page.locator("header .lang-toggle").click();
 await page.waitForFunction(() => document.querySelector("#add")!.textContent === "Add" && document.documentElement.dir === "ltr");
 await shot(page, "11-main-en");
+
+// Updates: off by default here (KV_NO_UPDATE_CHECK). A stubbed updater finds 9.9.9 once the user turns the check on;
+// its download fails, so nothing is installed — the banner stays and says why
+if ((await page.textContent("#updatesBtn")) !== "Update check: off") throw new Error("update check not off: " + (await page.textContent("#updatesBtn")));
+await page.evaluate(() => {
+  window.__TAURI__.updater.check = async () => ({
+    version: "9.9.9",
+    download: async () => {
+      throw new Error("stub download");
+    },
+    install: async () => {},
+  });
+});
+await page.click("#updatesBtn");
+await page.waitForSelector("#updateBar:not([hidden])");
+if ((await page.textContent("#updateText")) !== "kv-vault 9.9.9 is available.") throw new Error("update text: " + (await page.textContent("#updateText")));
+if ((await page.textContent("#updatesBtn")) !== "Update check: on") throw new Error("update check not on");
+await shot(page, "11b-update");
+await page.click("#updateInstall");
+await page.waitForFunction(() => document.querySelector("#toast")!.textContent!.includes("stub download"));
+if (await page.locator("#updateInstall").isDisabled()) throw new Error("install button stuck after a failed download");
+await page.click("#updateLater");
+if (await visible(page, "#updateBar")) throw new Error("Later did not hide the update bar");
+await page.click("#updatesBtn");
+await page.waitForFunction(() => document.querySelector("#updatesBtn")!.textContent === "Update check: off");
+log("updates: turned on → stubbed 9.9.9 shown, failed download reported, Later hides, turned off");
 const catsEn = (await page.locator("#cats").textContent()) ?? "";
 if (!catsEn.includes("Logins") || !catsEn.includes("Dev keys")) throw new Error("categories not in English: " + catsEn);
 await page.locator(".item .open").first().click();

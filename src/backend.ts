@@ -19,6 +19,7 @@ import { copyWithClear } from "./io.ts";
 import * as store from "./store.ts";
 import { totp } from "./totp.ts";
 import { TYPES } from "./types.ts";
+import { setUpdates, updatesEnabled } from "./updates.ts";
 
 const IDLE_MS = 15 * 60 * 1000;
 let session: store.Session | null = null;
@@ -229,6 +230,13 @@ const methods = {
   },
 
   browserDisable: () => disableBrowser(),
+
+  updates: () => ({ enabled: updatesEnabled() }),
+
+  setUpdates({ on }) {
+    setUpdates(on === true);
+    return { enabled: updatesEnabled() };
+  },
 
   // ── Sync ──
   syncStatus: () => ({ ...sync.syncStatus(session?.data), revision }),

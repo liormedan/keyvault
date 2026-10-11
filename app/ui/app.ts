@@ -915,7 +915,7 @@ async function openSync(): Promise<void> {
 
 // The backend syncs on its own (after saves, and when the folder changes); reload the list when it did
 setInterval(async () => {
-  if ($("#main").hidden) return;
+  if ($("#main").hidden || updating) return;
   try {
     const { revision } = await invoke<Result<"syncStatus">>("kv", { method: "syncStatus" });
     if (syncRevision >= 0 && revision !== syncRevision && !dlg().open) await load();
@@ -1306,11 +1306,70 @@ $("#forget").onclick = safe(async () => {
   toast(tr("forgotten"));
 });
 
+// ── Updates ──
+// Tauri's updater reads latest.json from the newest GitHub release and accepts only an update signed with the key in
+// tauri.conf.json. On by default; the footer link turns it off (config.json, through the backend).
+
+let update: Update | null = null;
+let updating = false;
+
+async function renderUpdatesBtn(): Promise<boolean> {
+  const { enabled } = await kv("updates");
+  $("#updatesBtn").textContent = tr(enabled ? "main.updatesOn" : "main.updatesOff");
+  return enabled;
+}
+
+async function checkUpdate(): Promise<void> {
+  try {
+    if (!(await renderUpdatesBtn()) || update) return;
+    update = await window.__TAURI__.updater.check();
+    if (!update) return;
+    $("#updateText").textContent = tr("update.available", { version: update.version });
+    $("#updateBar").hidden = false;
+  } catch {} // offline, or the release has no latest.json yet — try again next time
+}
+
+$("#updatesBtn").onclick = safe(async () => {
+  const { enabled } = await kv("updates");
+  await kv("setUpdates", { on: !enabled });
+  toast(tr(enabled ? "update.turnedOff" : "update.turnedOn"));
+  if (enabled) $("#updateBar").hidden = true;
+  else await checkUpdate();
+  await renderUpdatesBtn();
+});
+
+$("#updateLater").onclick = () => {
+  $("#updateBar").hidden = true;
+};
+
+// Download first, then lock and end the backend, so the installer can replace it; Windows closes the app to install
+$("#updateInstall").onclick = async () => {
+  if (!update || updating) return;
+  updating = true;
+  const btn = $<HTMLButtonElement>("#updateInstall");
+  btn.disabled = true;
+  $("#updateText").textContent = tr("update.downloading", { version: update.version });
+  try {
+    await update.download();
+    await kv("lock").catch(() => {});
+    await invoke("kv_stop");
+    await update.install();
+    await window.__TAURI__.process.relaunch();
+  } catch (e) {
+    updating = false;
+    btn.disabled = false;
+    $("#updateText").textContent = tr("update.available", { version: update.version });
+    toast(tr("update.failed", { reason: message(e) }));
+  }
+};
+
 // Language switch: the backend follows (so its errors match), the open view re-renders
 document.addEventListener("kv-lang", async (ev) => {
   await kv("setLang", { lang: ev.detail }).catch(() => {});
   if (dlg().open) dlg().close();
   if (!$("#main").hidden) render();
+  if (update) $("#updateText").textContent = tr("update.available", { version: update.version });
+  await renderUpdatesBtn().catch(() => {});
 });
 
 // On start: if remembered, unlock without a password
@@ -1320,4 +1379,6 @@ void (async () => {
   if (st?.exists && !st.unlocked && st.remembered) {
     await kv("unlock", {}).then(show, () => {});
   }
+  await checkUpdate();
 })();
+setInterval(() => void checkUpdate(), 12 * 3600_000);

@@ -6,11 +6,13 @@
 
 A local, encrypted vault for a developer's API keys — one file, no account, no server.
 `kv run -- npm run dev` injects a project's keys as environment variables, so there's no `.env` file to leak.
-A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app that also keeps logins, cards and notes.
+A `kv` command line for Windows, macOS and Linux, plus a desktop app for Windows and Linux that also keeps logins, cards and notes.
+
+**For everyone:** [liormedan.github.io/kv-vault](https://liormedan.github.io/kv-vault/) — what it does and a download for your system.
 
 ![kv-vault in a terminal](docs/demo.svg)
 
-<details><summary>The desktop app (Windows)</summary>
+<details><summary>The desktop app</summary>
 
 ![kv-vault desktop app](docs/screenshot.png)
 
@@ -35,13 +37,14 @@ A `kv` command line for Windows, macOS and Linux, plus a Windows desktop app tha
 - **CLI for dev keys** — pipe a key into another tool, or run a command with a project's keys as environment variables, without writing a `.env` file.
 - **Remember me** — the derived key, not the password, goes to the system's own secret store: DPAPI on Windows, Keychain on macOS, Secret Service (GNOME Keyring / KWallet) on Linux.
 - **Leak guard** — `kv guard` stops a commit that contains any value from the vault; `kv scan` finds the `.env` and key files scattered on disk.
+- **Automatic updates** — the desktop app finds a new release on GitHub and installs it on one click, accepting only installers signed with the project's update key. *Update check* at the bottom of the window turns it off.
 - **Scriptable** — `--json` output, exit codes `0` ok · `1` failed · `2` wrong arguments, shell completion.
 
 ## Get kv-vault
 
-### Desktop app — Windows, for everyone
+### Desktop app — Windows and Linux, for everyone
 
-1. Download **`kv-vault_x.y.z_x64-setup.exe`** from the [latest release](https://github.com/liormedan/kv-vault/releases/latest).
+1. Download from the [latest release](https://github.com/liormedan/kv-vault/releases/latest): **`kv-vault_x.y.z_x64-setup.exe`** for Windows, **`kv-vault_x.y.z_amd64.AppImage`** (`chmod +x`, then run) or **`.deb`** (`sudo apt install ./kv-vault_x.y.z_amd64.deb`) for Linux.
 2. Run it. It installs for your user only (no admin rights) and brings everything it needs — no Node.js, no other software. Windows may warn that the publisher is unknown, because the installer isn't code-signed yet: **More info → Run anyway**. To check that a download really came from this repository's build: `gh attestation verify kv-vault_x.y.z_x64-setup.exe --repo liormedan/kv-vault`.
 3. Choose a master password. It can't be recovered — the app's **Emergency export…** is the way back if you forget it, so make one.
 4. **Add → Import from a browser or password manager** brings in what you have: Chrome / Edge / Firefox / Safari exports, 1Password, Bitwarden, KeePass, LastPass.
@@ -61,7 +64,7 @@ kv init
 
 Shell completion: `source <(kv completion bash)` (also `zsh`, `fish`, `powershell`). On Linux, `kv copy` needs `wl-clipboard` (Wayland) or `xclip` (X11).
 
-Every release is built and published by GitHub Actions, and both the installer and the package carry a build attestation linking back to the workflow run.
+Every release is built and published by GitHub Actions. Each file carries a build attestation linking back to the workflow run, `SHA256SUMS.txt` lists them all, and `kv-vault-vX.Y.Z.spdx.json` is the SBOM — every npm and Rust dependency. The desktop app updates itself from the same release page (Windows installer, Linux AppImage); a `.deb` updates by installing the newer one.
 
 ### Your secrets stay out of git
 

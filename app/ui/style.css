@@ -94,6 +94,8 @@ code { font-family: ui-monospace, Consolas, monospace; background:var(--bg); pad
 .gate-links { display:flex; justify-content:center; gap:16px; }
 :root[dir="ltr"] .name { text-align:left; }
 .footer-links { display:flex; gap:16px; flex-wrap:wrap; }
+.update-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:8px 16px; background:var(--card); border-bottom:1px solid var(--accent); font-size:14px; }
+.update-bar span { flex:1; min-width:12em; }
 .chip.on { color:var(--accent); border-color:var(--accent); }
 .path-box { flex:1; min-width:0; word-break:break-all; padding:6px 8px; }
 .steps .field-row { margin-top:6px; }
